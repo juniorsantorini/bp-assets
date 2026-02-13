@@ -1,0 +1,463 @@
+(function(){
+  'use strict';
+
+  var CONFIG = {
+    cardSelector: '.music-card',
+    artistMetaSelector: '.meta',
+    tagsSelector: '.tag',
+    plansContainerId: 'bp-artist-plans',
+    promoStoragePrefix: 'promo_'
+  };
+
+  /* ======================
+     UTILIDADES
+  ====================== */
+  function normalize(s){ return String(s||'').toLowerCase().trim(); }
+
+  function stripAccents(s){
+    try { return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    catch(e){ return String(s||''); }
+  }
+
+  function toSlugUniversal(s){
+    s = stripAccents(s);
+    s = normalize(s);
+    s = s.replace(/^#/, '');
+    s = s.replace(/[^a-z0-9]+/g,'-');
+    s = s.replace(/-+/g,'-').replace(/^-|-$/g,'');
+    return s;
+  }
+
+  function escHtml(s){
+    return String(s||'').replace(/[&<>"']/g,function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);
+    });
+  }
+
+  /* ======================
+     PROMO PARSER (MODO 2)
+     - #promo         => 7d
+     - #promo7        => 7d
+     - #promo7d       => 7d
+     - #promo2m       => 2m
+     - #promo1h       => 1h
+  ====================== */
+  function isPromoTagText(tx){
+    var t = normalize(tx).replace(/^#/,'');
+    return /^promo(\d+)?([mhd])?$/.test(t); // <-- ALTERADO (aceita m/h/d)
+  }
+
+  function getPromoDurationMsFromTags(card){
+    var tagsBox = card.querySelector('.tags');
+    if(!tagsBox) return 0;
+
+    var raw = tagsBox.textContent || '';
+
+    // pega primeiro match: promo + número + unidade opcional
+    // exemplos: #promo, #promo7, #promo7d, #promo2m, #promo1h
+    var m = raw.match(/#?promo(\d+)?([mhd])?\b/i);
+    if(!m) return 0;
+
+    var n = m[1] ? parseInt(m[1], 10) : 0;
+    var unit = (m[2] || '').toLowerCase();
+
+    // padrão: #promo sem número = 7 dias
+    if(!n) return 7 * 86400000;
+
+    // sem unidade => dias (compatível com #promo7 antigo)
+    if(!unit) unit = 'd';
+
+    if(unit === 'm') return n * 60000;
+    if(unit === 'h') return n * 3600000;
+    return n * 86400000; // 'd'
+  }
+
+  /* ======================
+     READY SIGNAL (pro seu loader)
+  ====================== */
+  var signaled = false;
+  function signalReady(){
+    if(signaled) return;
+    signaled = true;
+    try { document.body.classList.add('cards-ready'); } catch(e){}
+    try { document.dispatchEvent(new CustomEvent('bp:cardsReady')); } catch(e){}
+  }
+
+  // failsafe: NUNCA deixa o site preso em bp-loading
+  setTimeout(signalReady, 900);
+
+  /* ======================
+     TEMPO REAL (INTERNET)
+     - offset do servidor (Date header)
+  ====================== */
+  var serverOffsetMs = null;
+  var serverTimePromise = null;
+
+  function getServerNow(){
+    if(serverOffsetMs !== null) return Promise.resolve(Date.now() + serverOffsetMs);
+    if(serverTimePromise) return serverTimePromise;
+
+    serverTimePromise = fetch(location.origin + '/?bp_ts=' + Date.now(), {
+      method: 'HEAD',
+      cache: 'no-store',
+      credentials: 'omit'
+    }).then(function(r){
+      var dh = r.headers.get('Date');
+      if(!dh){ serverOffsetMs = 0; return Date.now(); }
+      var serverMs = Date.parse(dh);
+      if(isNaN(serverMs)){ serverOffsetMs = 0; return Date.now(); }
+      serverOffsetMs = serverMs - Date.now();
+      return Date.now() + serverOffsetMs;
+    }).catch(function(){
+      serverOffsetMs = 0;
+      return Date.now();
+    });
+
+    return serverTimePromise;
+  }
+
+  /* ======================
+     PLANOS (WIDGET)
+  ====================== */
+  var plansCache = null;
+
+  function parseExpDate(exp){
+    var x = String(exp||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(x)) return null;
+    if(x.length === 10) x += 'T23:59:59';
+    var d = new Date(x);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function loadPlans(){
+    if(plansCache) return plansCache;
+
+    plansCache = {};
+    var root = document.getElementById(CONFIG.plansContainerId);
+    if(!root) return plansCache;
+
+    var spans = root.querySelectorAll('span[data-slug]');
+    var now = Date.now();
+
+    for(var i=0;i<spans.length;i++){
+      var slug = toSlugUniversal(spans[i].getAttribute('data-slug'));
+      var plan = normalize(spans[i].getAttribute('data-plan'));
+      var exp  = spans[i].getAttribute('data-exp');
+
+      var expDate = parseExpDate(exp);
+      var active = !!(expDate && now <= expDate.getTime());
+
+      plansCache[slug] = { plan: plan, active: active };
+    }
+    return plansCache;
+  }
+
+  function getPlanByArtist(name){
+    var slug = toSlugUniversal(name);
+    var map = loadPlans();
+    return map[slug] || null;
+  }
+
+  /* ======================
+     PÁGINAS DE ARTISTA (AUTO)
+     - NÃO bloqueia a home
+  ====================== */
+  var pagesMap = null;
+  var pagesPromise = null;
+
+  function baseSlugFromArtistPageUrl(url){
+    try{
+      var u = String(url||'');
+      var m = u.match(/\/p\/([^\/?#]+)\.html/i);
+      if(!m) return '';
+      var file = m[1]; // "slug_123" ou "slug"
+      return normalize(file.split('_')[0]);
+    }catch(e){
+      return '';
+    }
+  }
+
+  function loadArtistPagesAsync(){
+    if(pagesMap) return Promise.resolve(pagesMap);
+    if(pagesPromise) return pagesPromise;
+
+    pagesPromise = fetch('/feeds/pages/default?alt=json&max-results=500', { credentials: 'omit' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        pagesMap = {};
+        var entries = (((j||{}).feed||{}).entry) || [];
+        for(var i=0;i<entries.length;i++){
+          var e = entries[i];
+          var links = e.link || [];
+          var href = '';
+          for(var k=0;k<links.length;k++){
+            if(links[k].rel === 'alternate' && links[k].href){
+              href = links[k].href; break;
+            }
+          }
+          if(!href) continue;
+
+          var base = baseSlugFromArtistPageUrl(href);
+          if(!base) continue;
+          if(!pagesMap[base]) pagesMap[base] = href;
+        }
+        return pagesMap;
+      })
+      .catch(function(){
+        pagesMap = {};
+        return pagesMap;
+      });
+
+    return pagesPromise;
+  }
+
+  function getArtistPageUrlByName(name){
+    if(!pagesMap) return null;
+    var slug = toSlugUniversal(name);
+    return pagesMap[slug] || null;
+  }
+
+  /* ======================
+     PROMO UI
+  ====================== */
+  function ensurePromoFire(card){
+    var titleLink = card.querySelector('.title a, a.title-link');
+    if(!titleLink) return;
+    if(titleLink.querySelector('.promo-fire')) return;
+
+    var fire = document.createElement('span');
+    fire.className = 'promo-fire';
+    fire.innerHTML = '&#128293;';
+    titleLink.appendChild(fire);
+  }
+
+  function removePromoFire(card){
+    var titleLink = card.querySelector('.title a, a.title-link');
+    if(!titleLink) return;
+    var fire = titleLink.querySelector('.promo-fire');
+    if(fire) fire.remove();
+  }
+
+  function hideOnlyPromoTags(card){
+    var tags = card.querySelectorAll(CONFIG.tagsSelector);
+    for(var i=0;i<tags.length;i++){
+      var tx = (tags[i].textContent || '').trim();
+      if(isPromoTagText(tx)){
+        tags[i].style.display = 'none';
+      } else {
+        tags[i].style.display = '';
+      }
+    }
+  }
+
+  /* ======================
+     PROMO: MODO 2 (MOMENTO DA TAG)
+     - SEM feed de posts
+     - hora base = serverNowMs
+  ====================== */
+  function promoKeyForCard(card, durationMs){
+    var audioUrl = card.getAttribute('data-audio-url') || '';
+    var hrefEl = card.querySelector('.title a, a.title-link');
+    var href = hrefEl ? (hrefEl.getAttribute('href')||'') : '';
+    var title = hrefEl ? (hrefEl.textContent||'').trim() : '';
+    var base = audioUrl || href || title || ('card_' + Math.random());
+
+    // inclui duração no key: trocar #promo2m -> #promo5m reinicia promo
+    return CONFIG.promoStoragePrefix + (durationMs + '__' + base).replace(/[^a-zA-Z0-9]/g, '_');
+  }
+
+  function getPromoRemainingMs_Mode2(card, durationMs, serverNowMs){
+    if(!durationMs) return 0;
+
+    var key = promoKeyForCard(card, durationMs);
+
+    try{
+      var stored = localStorage.getItem(key);
+      if(!stored){
+        localStorage.setItem(key, JSON.stringify({ start: serverNowMs, dur: durationMs }));
+        return durationMs;
+      }
+      var obj = JSON.parse(stored);
+      if(!obj || !obj.start || !obj.dur) throw 0;
+
+      var end = obj.start + obj.dur;
+      return end - serverNowMs;
+    }catch(e){
+      try { localStorage.removeItem(key); } catch(e2){}
+      // reinicia limpo
+      try { localStorage.setItem(key, JSON.stringify({ start: serverNowMs, dur: durationMs })); } catch(e3){}
+      return durationMs;
+    }
+  }
+
+  /* ======================
+     MOVE PROMOS PRO TOPO
+  ====================== */
+  function getPostWrapper(card){
+    return card.closest('.index-post') ||
+           card.closest('.blog-post') ||
+           card.closest('article') ||
+           card.closest('.post') ||
+           null;
+  }
+
+  function movePromosToTop(promoCards){
+    if(!promoCards.length) return;
+
+    var wrappers = [];
+    var seen = new Set();
+
+    for(var i=0;i<promoCards.length;i++){
+      var w = getPostWrapper(promoCards[i]);
+      if(w && !seen.has(w)){
+        seen.add(w);
+        wrappers.push(w);
+      }
+    }
+    if(!wrappers.length) return;
+
+    var container = wrappers[0].parentNode;
+    if(!container) return;
+
+    var children = Array.prototype.slice.call(container.children);
+    var ok = true;
+    for(var k=0;k<wrappers.length;k++){
+      if(children[k] !== wrappers[k]) { ok = false; break; }
+    }
+    if(ok) return;
+
+    for(var x=wrappers.length-1; x>=0; x--){
+      container.insertBefore(wrappers[x], container.firstChild);
+    }
+  }
+
+  /* ======================
+     HOME – CARDS
+  ====================== */
+  function enhanceCards(serverNowMs){
+    var cards = document.querySelectorAll(CONFIG.cardSelector);
+    if(!cards.length) return;
+
+    var promos = []; // {card, remaining}
+
+    for(var i=0;i<cards.length;i++){
+      var card = cards[i];
+
+      hideOnlyPromoTags(card);
+
+      var meta = card.querySelector(CONFIG.artistMetaSelector);
+      if(!meta) continue;
+
+      var text = meta.textContent || '';
+      var parts = text.split('•');
+      if(parts.length < 2) continue;
+
+      var artists = parts[0].trim().split(/\s*[,&]\s*|\s+e\s+/i);
+      var bpm = parts.slice(1).join('•').trim();
+
+      var html = [];
+
+      for(var a=0;a<artists.length;a++){
+        var name = artists[a].trim();
+        if(!name) continue;
+
+        var plan = getPlanByArtist(name);
+        var verified = !!(plan && plan.active && (plan.plan === 'starter' || plan.plan === 'astro'));
+
+        var pageUrl = getArtistPageUrlByName(name);
+        var nameHtml = pageUrl
+          ? '<a class="artist-link" href="'+escHtml(pageUrl)+'">'+escHtml(name)+'</a>'
+          : escHtml(name);
+
+        html.push(nameHtml + (verified ? ' <span class="verified-badge"></span>' : ''));
+      }
+
+      var newMetaHtml = html.join(', ') + ' &bull; ' + escHtml(bpm);
+      if(meta.innerHTML !== newMetaHtml){
+        meta.innerHTML = newMetaHtml;
+      }
+
+      // PROMO (MODO 2)
+      var durationMs = getPromoDurationMsFromTags(card);
+      if(durationMs > 0){
+        var remaining = getPromoRemainingMs_Mode2(card, durationMs, serverNowMs);
+        if(remaining > 0){
+          ensurePromoFire(card);
+          promos.push({card: card, remaining: remaining});
+        } else {
+          removePromoFire(card);
+        }
+      } else {
+        removePromoFire(card);
+      }
+    }
+
+    promos.sort(function(a,b){ return b.remaining - a.remaining; });
+    movePromosToTop(promos.map(function(x){ return x.card; }));
+  }
+
+  /* ======================
+     PÁGINA DE ARTISTA (classes)
+  ====================== */
+  function enhanceArtistPage(){
+    var container = document.querySelector('.artist-container');
+    if(!container) return;
+
+    var nameEl = container.querySelector('.artist-name');
+    if(!nameEl) return;
+
+    var name = nameEl.textContent.trim();
+    var plan = getPlanByArtist(name);
+
+    var verified = !!(plan && plan.active);
+    var isAstro = verified && plan.plan === 'astro';
+
+    container.classList.remove('is-verified','is-astro');
+    if(verified) container.classList.add('is-verified');
+    if(isAstro)  container.classList.add('is-astro');
+  }
+
+  /* ======================
+     INIT / API GLOBAL
+  ====================== */
+  var running = false;
+  function run(){
+    if(running) return;
+    running = true;
+
+    loadPlans();
+
+    getServerNow().then(function(serverNowMs){
+      signalReady();
+
+      enhanceCards(serverNowMs);
+      enhanceArtistPage();
+
+      // páginas em background (links aparecem assim que carregar)
+      loadArtistPagesAsync().then(function(){ enhanceCards(serverNowMs); });
+
+    }).catch(function(){
+      signalReady();
+      enhanceCards(Date.now());
+      enhanceArtistPage();
+      loadArtistPagesAsync().then(function(){ enhanceCards(Date.now()); });
+    }).finally(function(){
+      requestAnimationFrame(function(){ running = false; });
+    });
+  }
+
+  window.bpCards = window.bpCards || {};
+  window.bpCards.run = run;
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
+
+  try{
+    new MutationObserver(function(){ run(); }).observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+
+})();
+  
