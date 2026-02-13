@@ -1,0 +1,130 @@
+<!-- ============================= -->
+<!-- LOADER + FORCE RELOAD (F5 REAL VIA URL) -->
+<!-- ============================= -->
+
+<script type='text/javascript'>
+//<![CDATA[
+(function(){
+  // Só HOME
+  if(!document.body) return;
+  if(!document.body.classList.contains('home') && location.pathname !== "/" && location.pathname !== "") return;
+
+  var CARD_SEL = ".music-card";
+  var RELOAD_KEY = "bp_force_reload_once_v2";
+
+  // tempos (rápido)
+  var CHECK_AFTER_MS = 800;
+  var RELOAD_AT_MS   = 999999;
+  var HARD_LIMIT_MS  = 2500;
+
+  function removeLoader(){
+    try { clearTimeout(window.__bpLoaderFailsafe); } catch(e){}
+    document.documentElement.classList.remove('bp-loading');
+    var l = document.getElementById('bpLoader');
+    if(l) l.remove();
+  }
+
+  function tryFix(){
+    try {
+      if(window.bpCards && typeof window.bpCards.run === "function"){
+        window.bpCards.run();
+      }
+    } catch(e){}
+  }
+
+  function isCardOk(c){
+    // artistas: se tem texto, queremos link (quando existir página)
+    var artistsBox = c.querySelector(".artists, .artist, .meta");
+    var hasArtistsText = !!(artistsBox && (artistsBox.textContent || "").trim().length > 0);
+
+    // ✅ agora seu sistema cria links automaticamente quando existe página
+    // então: se tem texto de artista e NÃO tem NENHUM link, consideramos quebrado
+    var hasArtistLink  = !!c.querySelector(".artists a, .artist a, a.artist-link");
+    if(hasArtistsText && !hasArtistLink) return false;
+
+    // promo ainda pode continuar por tag (se você usa)
+    var tagsBox = c.querySelector(".tags");
+    var tagText = tagsBox ? (tagsBox.textContent || "") : "";
+    var wantsPromo  = /#promo/i.test(tagText);
+
+    var hasPromoBadge = !!c.querySelector(".promo-fire, .promo-badge, .badge-promo, .fire, .flame");
+    if(wantsPromo && !hasPromoBadge) return false;
+
+    return true;
+  }
+
+  function brokenRatio(){
+    var cards = document.querySelectorAll(CARD_SEL);
+    if(cards.length < 2) return 0;
+
+    var broken = 0;
+    for(var i=0;i<cards.length;i++){
+      if(!isCardOk(cards[i])) broken++;
+    }
+    return broken / cards.length;
+  }
+
+  function shouldReloadNow(){
+    if(!document.documentElement.classList.contains("bp-loading")) return false;
+    if(sessionStorage.getItem(RELOAD_KEY)) return false;
+    return brokenRatio() > 0.03;
+  }
+
+  function forceHardReload(){
+    sessionStorage.setItem(RELOAD_KEY, "1");
+    var base = location.href.split('#')[0];
+    var sep = base.indexOf('?') > -1 ? '&' : '?';
+    location.replace(base + sep + "r=" + Date.now());
+  }
+
+  var start = Date.now();
+
+  function tick(){
+    tryFix();
+
+    var elapsed = Date.now() - start;
+    var br = brokenRatio();
+
+    if(br <= 0.03){
+      removeLoader();
+      return;
+    }
+
+    if(elapsed >= RELOAD_AT_MS && shouldReloadNow()){
+      forceHardReload();
+      return;
+    }
+
+    if(elapsed >= HARD_LIMIT_MS){
+      removeLoader();
+      return;
+    }
+
+    setTimeout(tick, 120);
+  }
+
+  function startLoop(){
+    if(!document.documentElement.classList.contains("bp-loading")) return;
+    tryFix();
+    setTimeout(tick, 0);
+  }
+
+  document.addEventListener('bp:cardsReady', function(){
+    if(document.documentElement.classList.contains('bp-loading')){
+      setTimeout(function(){
+        if(brokenRatio() <= 0.03) removeLoader();
+      }, 60);
+    }
+  });
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", function(){
+      setTimeout(startLoop, CHECK_AFTER_MS);
+    });
+  } else {
+    setTimeout(startLoop, CHECK_AFTER_MS);
+  }
+
+})();
+//]]>
+</script>
