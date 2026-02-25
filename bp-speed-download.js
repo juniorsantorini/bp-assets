@@ -194,7 +194,7 @@
 
     btnNormal.addEventListener('click', function (e) {
       e.preventDefault();
-      if (!chkRemember.checked && Date.now() - modalOpenTime < 2000) return;
+      if (!chkRemember.checked && Date.now() - modalOpenTime < 1000) return;
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
       var url  = activeUrl;
       var meta = activeMeta;
@@ -203,7 +203,7 @@
     });
 
     btnSpeed.addEventListener('click', function () {
-      if (!chkRemember.checked && Date.now() - modalOpenTime < 2000) return;
+      if (!chkRemember.checked && Date.now() - modalOpenTime < 1000) return;
       if (chkRemember.checked) { setRemember(true); setPref('speed'); updatePrefBadges(); }
       runSpeedDownload(activeUrl);
     });
