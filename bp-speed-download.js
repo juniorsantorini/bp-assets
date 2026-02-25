@@ -121,14 +121,17 @@
       '.sdl-prog-bar{height:3px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}' +
       '.sdl-prog-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#a40781,#e070c8);transition:width .35s ease}' +
       '.sdl-prog-label{font-size:11px;color:rgba(255,255,255,.38);margin-top:8px;text-align:center}' +
-      '.bp-dl-pref-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:4px;background:rgba(164,7,129,.25);border:1px solid rgba(164,7,129,.4);color:#e070c8;font-weight:700;letter-spacing:.4px;pointer-events:none}';
+      '.bp-dl-pref-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:4px;background:rgba(164,7,129,.25);border:1px solid rgba(164,7,129,.4);color:#e070c8;font-weight:700;letter-spacing:.4px;pointer-events:none}' +
+      '.sdl-switch{display:none;width:100%;margin-top:14px;padding:11px 16px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);border-radius:14px;color:rgba(255,255,255,.65);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .18s,border-color .18s}' +
+      '.sdl-switch:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}' +
+      '.sdl-switch.show{display:block}';
     document.head.appendChild(s);
   }
 
   // =========================
   // Modal
   // =========================
-  var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel;
+  var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel, btnSwitch, btnClose;
   var activeUrl = '';
   var activeMeta = null;
 
@@ -141,6 +144,8 @@
       sdlProg     = document.getElementById('bp-sdl-prog');
       sdlFill     = document.getElementById('bp-sdl-fill');
       sdlLabel    = document.getElementById('bp-sdl-label');
+      btnSwitch   = document.getElementById('bp-sdl-switch');
+      btnClose    = document.getElementById('bp-sdl-close');
       return;
     }
 
@@ -178,6 +183,7 @@
           '<div class="sdl-prog-bar"><div class="sdl-prog-fill" id="bp-sdl-fill"></div></div>' +
           '<div class="sdl-prog-label" id="bp-sdl-label">Processando...</div>' +
         '</div>' +
+        '<button type="button" class="sdl-switch" id="bp-sdl-switch">🔄 Trocar preferência</button>' +
       '</div>';
 
     document.body.appendChild(overlay);
@@ -188,18 +194,23 @@
     sdlProg     = document.getElementById('bp-sdl-prog');
     sdlFill     = document.getElementById('bp-sdl-fill');
     sdlLabel    = document.getElementById('bp-sdl-label');
+    btnSwitch   = document.getElementById('bp-sdl-switch');
+    btnClose    = document.getElementById('bp-sdl-close');
 
-    document.getElementById('bp-sdl-close').addEventListener('click', closeModal);
-    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+    btnClose.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay && !btnClose.hidden) closeModal(); });
 
     btnNormal.addEventListener('click', function (e) {
       e.preventDefault();
       if (!chkRemember.checked && Date.now() - modalOpenTime < 1000) return;
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
-      var url  = activeUrl;
-      var meta = activeMeta;
-      closeModal();
-      clickNormal(url, meta);
+      // Esconde opções, mostra progresso
+      btnNormal.style.display = 'none';
+      btnSpeed.style.display  = 'none';
+      document.querySelector('.sdl-remember').style.display = 'none';
+      btnClose.hidden = true;
+      sdlProg.classList.add('show');
+      runNormalDownload(activeUrl);
     });
 
     btnSpeed.addEventListener('click', function () {
@@ -216,21 +227,30 @@
         clearRememberAndPref();
         updatePrefBadges();
       }
-      updateModalLock();
+    });
+
+    btnSwitch.addEventListener('click', function () {
+      clearRememberAndPref();
+      updatePrefBadges();
+      resetModalToChoice();
     });
   }
 
   var modalOpenTime = 0;
 
-  function updateModalLock() {
-    var pref = getPref();
-    var locked = getRemember() && !!pref;
-    btnNormal.disabled = locked && pref !== 'normal';
-    btnSpeed.disabled  = locked && pref !== 'speed';
-    btnNormal.style.opacity = (locked && pref !== 'normal') ? '0.35' : '';
-    btnSpeed.style.opacity  = (locked && pref !== 'speed')  ? '0.35' : '';
-    btnNormal.style.pointerEvents = (locked && pref !== 'normal') ? 'none' : '';
-    btnSpeed.style.pointerEvents  = (locked && pref !== 'speed')  ? 'none' : '';
+  function resetModalToChoice() {
+    // Mostra botões + checkbox, esconde progresso + switch, mostra ✕
+    btnNormal.style.display = '';
+    btnSpeed.style.display  = '';
+    btnSpeed.classList.remove('is-loading');
+    document.querySelector('.sdl-remember').style.display = '';
+    sdlProg.classList.remove('show');
+    sdlFill.style.width = '0%';
+    sdlLabel.textContent = 'Processando...';
+    btnSwitch.classList.remove('show');
+    btnClose.hidden = false;
+    chkRemember.checked = false;
+    modalOpenTime = Date.now();
   }
 
   function openModal(url, meta) {
@@ -241,18 +261,33 @@
     activeMeta = meta || null;
 
     btnNormal.href = '#';
+    var pref = getPref();
 
-    sdlProg.classList.remove('show');
-    sdlFill.style.width = '0%';
-    sdlLabel.textContent = 'Processando...';
-    btnSpeed.classList.remove('is-loading');
-
-    chkRemember.checked = getRemember();
-
-    overlay.classList.add('show');
-    document.body.style.overflow = 'hidden';
-    modalOpenTime = Date.now();
-    updateModalLock();
+    if (getRemember() && pref) {
+      // Auto-download mode: esconde opções, mostra progresso + switch, esconde ✕
+      btnNormal.style.display = 'none';
+      btnSpeed.style.display  = 'none';
+      document.querySelector('.sdl-remember').style.display = 'none';
+      sdlProg.classList.add('show');
+      sdlFill.style.width = '0%';
+      sdlLabel.textContent = 'Processando...';
+      btnSpeed.classList.remove('is-loading');
+      btnSwitch.classList.add('show');
+      btnClose.hidden = pref === 'speed';
+      overlay.classList.add('show');
+      document.body.style.overflow = 'hidden';
+      if (pref === 'speed') {
+        runSpeedDownload(url);
+      } else {
+        runNormalDownload(url);
+      }
+    } else {
+      // Choice mode normal
+      resetModalToChoice();
+      chkRemember.checked = getRemember();
+      overlay.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
   }
 
   function closeModal() {
@@ -358,6 +393,35 @@
         reject(new Error('Falha ao decodificar o áudio'));
       });
     });
+  }
+
+  function runNormalDownload(url) {
+    if (!url) return;
+    setProgress(0.05, 'Baixando arquivo...');
+    var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
+    fetch(fetchUrl)
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        setProgress(0.8, 'Preparando download...');
+        return res.blob();
+      })
+      .then(function (blob) {
+        setProgress(1, 'Pronto! Iniciando download...');
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = normalName(url, activeMeta);
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+          try { URL.revokeObjectURL(a.href); } catch(e){}
+          try { document.body.removeChild(a); } catch(e){}
+          closeModal();
+        }, 1800);
+      })
+      .catch(function (err) {
+        sdlFill.style.width = '0%';
+        sdlLabel.textContent = '❌ ' + (err.message || 'Erro no processamento');
+      });
   }
 
   function runSpeedDownload(url) {
