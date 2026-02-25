@@ -193,6 +193,7 @@
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
 
     btnNormal.addEventListener('click', function () {
+      btnNormal.href = activeUrl;
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
       closeModal();
     });
@@ -220,7 +221,7 @@
     activeUrl = url;
     activeMeta = meta || null;
 
-    btnNormal.href = url;
+    btnNormal.href = '#';
 
     sdlProg.classList.remove('show');
     sdlFill.style.width = '0%';
