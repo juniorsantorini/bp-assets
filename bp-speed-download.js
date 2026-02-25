@@ -1,7 +1,7 @@
 /**
  * bp-speed-download.js
- * Modal Normal / Speed para botões .music-card .download
- * Seguro, estável e à prova de timing.
+ * Modal Normal / Speed para .music-card .download
+ * Versão estável e corrigida.
  */
 
 (function () {
@@ -12,7 +12,7 @@
   var LAME_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
   var LS_PREF = 'bp_dl_pref';
 
-  var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel;
+  var overlay, btnNormal, btnSpeed, chkRemember;
   var activeUrl = '';
 
   /* ================= PREF ================= */
@@ -39,14 +39,11 @@
     var s = document.createElement('style');
     s.id = 'bp-sdl-css';
     s.textContent =
-      '#bp-sdl-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}' +
+      '#bp-sdl-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:999999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:.2s}' +
       '#bp-sdl-overlay.show{opacity:1;pointer-events:auto}' +
-      '#bp-sdl-modal{background:#120b10;border:1px solid rgba(164,7,129,.3);border-radius:18px;padding:24px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.6);font-family:sans-serif}' +
-      '.sdl-opt{display:block;width:100%;padding:12px 14px;margin-bottom:10px;border-radius:12px;background:#1c0e1a;color:#fff;border:1px solid rgba(255,255,255,.08);cursor:pointer;text-align:center}' +
-      '.sdl-opt:hover{background:#2a1023}' +
-      '.sdl-prog{display:none;margin-top:12px}' +
-      '.sdl-prog.show{display:block}' +
-      '.sdl-prog-fill{height:3px;width:0;background:#a40781;transition:width .3s}';
+      '#bp-sdl-modal{background:#120b10;border-radius:18px;padding:24px;width:100%;max-width:340px;color:#fff;text-align:center}' +
+      '.sdl-btn{display:block;width:100%;margin:8px 0;padding:10px;border-radius:10px;background:#1c0e1a;color:#fff;border:none;cursor:pointer}' +
+      '.sdl-btn:hover{background:#2a1023}';
     document.head.appendChild(s);
   }
 
@@ -57,23 +54,16 @@
     overlay = document.getElementById('bp-sdl-overlay');
 
     if (!overlay) {
-
       overlay = document.createElement('div');
       overlay.id = 'bp-sdl-overlay';
 
       overlay.innerHTML =
         '<div id="bp-sdl-modal">' +
-          '<h3 style="color:#fff;margin:0 0 15px;">Baixar faixa</h3>' +
-
-          '<a id="bp-sdl-normal" class="sdl-opt" href="#" download>Versao Normal</a>' +
-          '<button id="bp-sdl-speed" class="sdl-opt">Versao Speed</button>' +
-
-          '<div style="margin-top:10px;color:#aaa;font-size:12px;">' +
+          '<h3>Baixar faixa</h3>' +
+          '<button id="bp-sdl-normal" class="sdl-btn">Versao Normal</button>' +
+          '<button id="bp-sdl-speed" class="sdl-btn">Versao Speed</button>' +
+          '<div style="margin-top:10px;font-size:12px;color:#aaa;">' +
             '<input type="checkbox" id="bp-sdl-chk"> Lembrar minha escolha' +
-          '</div>' +
-
-          '<div id="bp-sdl-prog" class="sdl-prog">' +
-            '<div class="sdl-prog-fill" id="bp-sdl-fill"></div>' +
           '</div>' +
         '</div>';
 
@@ -84,20 +74,13 @@
       });
     }
 
-    /* 🔥 SEMPRE RECAPTURA REFERÊNCIAS */
     btnNormal = document.getElementById('bp-sdl-normal');
     btnSpeed = document.getElementById('bp-sdl-speed');
     chkRemember = document.getElementById('bp-sdl-chk');
-    sdlProg = document.getElementById('bp-sdl-prog');
-    sdlFill = document.getElementById('bp-sdl-fill');
-
-    if (!btnNormal || !btnSpeed) {
-      console.error('Modal nao inicializado corretamente');
-      return;
-    }
 
     btnNormal.onclick = function () {
       if (chkRemember && chkRemember.checked) setPref('normal');
+      window.location.href = activeUrl; // 🔥 mantém contador
       closeModal();
     };
 
@@ -110,17 +93,12 @@
   function openModal(url) {
     injectCSS();
     buildModal();
-
     activeUrl = url;
-    btnNormal.href = url;
-    btnNormal.setAttribute('download', baseName(url));
-
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
   }
 
   function closeModal() {
-    if (!overlay) return;
     overlay.classList.remove('show');
     document.body.style.overflow = '';
   }
@@ -138,11 +116,6 @@
   }
 
   function runSpeedDownload(url) {
-
-    if (!url) return;
-
-    sdlProg.classList.add('show');
-    sdlFill.style.width = '10%';
 
     fetch(url)
       .then(function (r) { return r.arrayBuffer(); })
@@ -162,14 +135,10 @@
           src.connect(offline.destination);
           src.start(0);
 
-          sdlFill.style.width = '50%';
-
           return offline.startRendering();
         });
       })
       .then(function (rendered) {
-
-        sdlFill.style.width = '70%';
 
         loadLame(function () {
 
@@ -189,27 +158,16 @@
 
           var blob = new Blob(mp3Data, { type: 'audio/mp3' });
 
-          sdlFill.style.width = '100%';
-
           var a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = baseName(url).replace('.mp3','_speed.mp3');
+          a.download = url.split('/').pop().replace('.mp3','_speed.mp3');
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
 
           closeModal();
         });
-      })
-      .catch(function (err) {
-        console.error(err);
-        closeModal();
       });
-  }
-
-  function baseName(url) {
-    var b = String(url).split('?')[0];
-    return b.substring(b.lastIndexOf('/') + 1);
   }
 
   /* ================= CLICK INTERCEPT ================= */
@@ -224,14 +182,18 @@
 
     var pref = getPref();
 
-    if (pref === 'normal') return;
+    // 🔥 REMOVE download nativo antes do navegador agir
+    link.removeAttribute('download');
 
     e.preventDefault();
     e.stopPropagation();
 
+    if (pref === 'normal') {
+      window.location.href = url;
+      return;
+    }
+
     if (pref === 'speed') {
-      injectCSS();
-      buildModal();
       activeUrl = url;
       runSpeedDownload(url);
       return;
