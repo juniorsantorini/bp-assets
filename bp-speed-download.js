@@ -194,7 +194,7 @@
 
     btnNormal.addEventListener('click', function (e) {
       e.preventDefault();
-      if (Date.now() - modalOpenTime < 2000) return;
+      if (!chkRemember.checked && Date.now() - modalOpenTime < 2000) return;
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
       var url  = activeUrl;
       var meta = activeMeta;
@@ -203,7 +203,7 @@
     });
 
     btnSpeed.addEventListener('click', function () {
-      if (Date.now() - modalOpenTime < 2000) return;
+      if (!chkRemember.checked && Date.now() - modalOpenTime < 2000) return;
       if (chkRemember.checked) { setRemember(true); setPref('speed'); updatePrefBadges(); }
       runSpeedDownload(activeUrl);
     });
@@ -216,10 +216,22 @@
         clearRememberAndPref();
         updatePrefBadges();
       }
+      updateModalLock();
     });
   }
 
   var modalOpenTime = 0;
+
+  function updateModalLock() {
+    var pref = getPref();
+    var locked = getRemember() && !!pref;
+    btnNormal.disabled = locked && pref !== 'normal';
+    btnSpeed.disabled  = locked && pref !== 'speed';
+    btnNormal.style.opacity = (locked && pref !== 'normal') ? '0.35' : '';
+    btnSpeed.style.opacity  = (locked && pref !== 'speed')  ? '0.35' : '';
+    btnNormal.style.pointerEvents = (locked && pref !== 'normal') ? 'none' : '';
+    btnSpeed.style.pointerEvents  = (locked && pref !== 'speed')  ? 'none' : '';
+  }
 
   function openModal(url, meta) {
     injectCSS();
@@ -240,6 +252,7 @@
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
     modalOpenTime = Date.now();
+    updateModalLock();
   }
 
   function closeModal() {
