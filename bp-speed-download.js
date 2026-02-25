@@ -566,35 +566,6 @@
 
     var pref = getPref();
 
-    if (pref === 'normal') {
-      e.preventDefault();
-      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-      if (e.stopPropagation) e.stopPropagation();
-      clickNormal(url, meta);
-      return;
-    }
-
-    if (pref === 'speed') {
-      e.preventDefault();
-      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-      if (e.stopPropagation) e.stopPropagation();
-
-      injectCSS();
-      buildModal();
-      overlay.classList.add('show');
-      document.body.style.overflow = 'hidden';
-
-      activeUrl = url;
-      activeMeta = meta;
-
-      sdlProg.classList.add('show');
-      setProgress(0.05, 'Baixando arquivo...');
-      btnSpeed.classList.add('is-loading');
-
-      runSpeedDownload(url);
-      return;
-    }
-
     e.preventDefault();
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     if (e.stopPropagation) e.stopPropagation();
