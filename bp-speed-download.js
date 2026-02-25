@@ -3,6 +3,11 @@
  * Intercepta clique no "Baixar" dos music-cards e abre modal Normal/Speed.
  * Speed é gerado no navegador (OfflineAudioContext + lamejs).
  *
+ * FIX:
+ *  - Nome do arquivo SPEED no padrão bonito: "ARTISTA - TITULO [borapracima.site]__ID_speed.mp3"
+ *    (usa data-artist / data-title do .music-card + __ID da URL)
+ *  - "Lembrar minha escolha" agora pode marcar e DESMARCAR (de verdade).
+ *
  * DEBUG: badge + logs + contador de intercept.
  * (Depois a gente remove o DEBUG fácil.)
  */
@@ -10,12 +15,10 @@
   'use strict';
 
   // =========================
-  // DEBUG (depois removemos)
+  // DEBUG
   // =========================
   var DEBUG = true;
   function dlog() { try { if (DEBUG) console.log.apply(console, arguments); } catch (e) {} }
-
-  try { window.BP_SDL_DEBUG = true; } catch (e) {}
 
   function debugBadge(msg) {
     if (!DEBUG) return;
@@ -39,10 +42,13 @@
   // =========================
   // CONFIG
   // =========================
-  var SPEED    = Math.pow(2, 133 / 1200); // mesma constante do player
+  var SPEED    = Math.pow(2, 133 / 1200);
   var MP3_KBPS = 128;
   var LAME_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
-  var LS_PREF  = 'bp_dl_pref'; // 'normal' | 'speed' | ''
+
+  // Preferência e "lembrar"
+  var LS_PREF     = 'bp_dl_pref';      // 'normal' | 'speed' | ''
+  var LS_REMEMBER = 'bp_dl_remember';  // '1' | ''
 
   dlog('[bp-speed-download] ATIVO (debug build)', { SPEED: SPEED, MP3_KBPS: MP3_KBPS });
   debugBadge('SDL ON');
@@ -61,6 +67,22 @@
       if (v) localStorage.setItem(LS_PREF, v);
       else localStorage.removeItem(LS_PREF);
     } catch (e) {}
+  }
+
+  function getRemember() {
+    try { return localStorage.getItem(LS_REMEMBER) === '1'; }
+    catch(e){ return false; }
+  }
+  function setRemember(on) {
+    try {
+      if (on) localStorage.setItem(LS_REMEMBER, '1');
+      else localStorage.removeItem(LS_REMEMBER);
+    } catch(e){}
+  }
+
+  function clearRememberAndPref() {
+    setRemember(false);
+    setPref('');
   }
 
   // =========================
@@ -140,6 +162,7 @@
   // =========================
   var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel;
   var activeUrl = '';
+  var activeMeta = null;
   var interceptCount = 0;
 
   function buildModal() {
@@ -162,7 +185,8 @@
         '<h3>Baixar faixa</h3>' +
         '<p class="sdl-sub">Escolha o formato do download</p>' +
 
-        '<a id="bp-sdl-normal" class="sdl-opt" href="#" download>' +
+        // IMPORTANTE: sem atributo download aqui, pra deixar o servidor dar o filename bonitão
+        '<a id="bp-sdl-normal" class="sdl-opt" href="#" rel="noopener">' +
           '<span class="sdl-icon">⬇️</span>' +
           '<span class="sdl-info">' +
             '<span class="sdl-title">Versão Normal</span>' +
@@ -205,54 +229,66 @@
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
 
     btnNormal.addEventListener('click', function () {
-      if (chkRemember.checked) { setPref('normal'); updatePrefBadges(); }
+      // Se está marcando pra lembrar, salva a escolha atual
+      if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
       closeModal();
-      // deixa o download ocorrer pelo próprio <a> do modal (href já setado)
-      // (não chamamos forceDownload aqui)
+      // deixa o <a> agir (download normal via servidor)
     });
 
     btnSpeed.addEventListener('click', function () {
-      if (chkRemember.checked) { setPref('speed'); updatePrefBadges(); }
+      if (chkRemember.checked) { setRemember(true); setPref('speed'); updatePrefBadges(); }
       runSpeedDownload(activeUrl);
     });
 
+    // Botão "Esquecer": limpa tudo e deixa checkbox desmarcado
     btnReset.addEventListener('click', function (e) {
       e.stopPropagation();
-      setPref('');
+      clearRememberAndPref();
       chkRemember.checked = false;
       btnReset.style.display = 'none';
       updatePrefBadges();
     });
 
+    // ✅ FIX: desmarcar realmente funciona
     chkRemember.addEventListener('change', function () {
-      if (!chkRemember.checked) { setPref(''); updatePrefBadges(); }
+      if (chkRemember.checked) {
+        setRemember(true);
+      } else {
+        // desmarcou -> apaga preferencia e "lembrar"
+        clearRememberAndPref();
+        updatePrefBadges();
+        var r = document.getElementById('bp-sdl-reset');
+        if (r) r.style.display = 'none';
+      }
     });
   }
 
-  function openModal(url) {
+  function openModal(url, meta) {
     injectCSS();
     buildModal();
 
     activeUrl = url;
+    activeMeta = meta || null;
 
-    // Normal aponta pro arquivo original
     btnNormal.href = url;
-    btnNormal.setAttribute('download', baseName(url));
 
     sdlProg.classList.remove('show');
     sdlFill.style.width = '0%';
     sdlLabel.textContent = 'Processando...';
     btnSpeed.classList.remove('is-loading');
 
+    // ✅ checkbox agora segue LS_REMEMBER (não LS_PREF)
+    var remember = getRemember();
+    chkRemember.checked = remember;
+
     var pref = getPref();
-    chkRemember.checked = !!pref;
     var btnReset = document.getElementById('bp-sdl-reset');
     btnReset.style.display = pref ? 'inline' : 'none';
 
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
 
-    dlog('[bp-speed-download] modal OPEN', url);
+    dlog('[bp-speed-download] modal OPEN', url, meta);
     debugBadge('MODAL');
   }
 
@@ -261,6 +297,7 @@
     overlay.classList.remove('show');
     document.body.style.overflow = '';
     activeUrl = '';
+    activeMeta = null;
   }
 
   // =========================
@@ -305,7 +342,7 @@
 
       var ctx = new AC();
       ctx.decodeAudioData(arrayBuffer.slice(0), function (decoded) {
-        ctx.close();
+        try { ctx.close(); } catch(e){}
 
         var ch = decoded.numberOfChannels, sr = decoded.sampleRate;
         var outL = Math.ceil(decoded.length / SPEED);
@@ -367,7 +404,7 @@
     sdlProg.classList.add('show');
     setProgress(0.05, 'Baixando arquivo...');
 
-    // mantém seu padrão ?dl=1
+    // mantém seu padrão ?dl=1 (conta no servidor)
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
 
     dlog('[bp-speed-download] speed START', fetchUrl);
@@ -385,7 +422,10 @@
 
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = speedName(url);
+
+        // ✅ nome bonito
+        a.download = speedName(url, activeMeta);
+
         document.body.appendChild(a);
         a.click();
 
@@ -405,27 +445,98 @@
   }
 
   // =========================
-  // Helpers
+  // Helpers: filename bonito
   // =========================
   function baseName(url) {
     var b = String(url || '').split('?')[0];
     return decodeURIComponent(b.substring(b.lastIndexOf('/') + 1) || 'musica.mp3');
   }
-  function speedName(url) {
-    return baseName(url).replace(/\.mp3$/i, '') + '_speed.mp3';
+
+  function extractIdFromFilename(fn) {
+    // pega o que vem depois de "__" (antes do .mp3)
+    // exemplo: "...__xpj4k18l.mp3" -> "xpj4k18l"
+    var m = String(fn || '').match(/__([a-z0-9_-]+)\.mp3$/i);
+    return m ? m[1] : '';
+  }
+
+  function sanitizeFilenamePart(s) {
+    s = String(s || '').trim();
+    // remove caracteres ruins pro Windows
+    s = s.replace(/[\\\/:*?"<>|]+/g, '');
+    // normaliza espaços
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+  }
+
+  function niceBaseNameFromMeta(url, meta) {
+    var fn = baseName(url); // filename da URL
+    var id = extractIdFromFilename(fn);
+
+    var artist = meta && meta.artist ? meta.artist : '';
+    var title  = meta && meta.title ? meta.title : '';
+
+    artist = sanitizeFilenamePart(artist);
+    title  = sanitizeFilenamePart(title);
+
+    // fallback se não achar meta
+    if (!artist && !title) {
+      // tenta tirar "__id" do nome cru
+      var raw = fn.replace(/\.mp3$/i, '');
+      raw = raw.replace(/__([a-z0-9_-]+)$/i, '');
+      raw = sanitizeFilenamePart(raw);
+      artist = raw || 'BoraPraCima';
+      title  = '';
+    }
+
+    var name = '';
+    if (artist && title) name = artist + ' - ' + title;
+    else if (artist)     name = artist;
+    else                 name = title || 'BoraPraCima';
+
+    name += ' [borapracima.site]';
+    if (id) name += '__' + id;
+    return name;
+  }
+
+  function speedName(url, meta) {
+    return niceBaseNameFromMeta(url, meta) + '_speed.mp3';
   }
 
   // =========================
-  // Neutralizar <a download> (pra impedir o browser de disparar antes)
-  // + manter neutralizado (cards podem ser recriados)
+  // Coletar meta do card
+  // =========================
+  function getMetaFromLink(link) {
+    try {
+      var card = link && link.closest ? link.closest('.music-card') : null;
+      if (!card) return null;
+
+      var artist = (card.dataset && (card.dataset.artist || card.getAttribute('data-artist'))) || '';
+      var title  = (card.dataset && (card.dataset.title  || card.getAttribute('data-title')))  || '';
+
+      // fallback: tenta pelo texto do title-link
+      if (!title) {
+        var tl = card.querySelector('.title-link');
+        if (tl && tl.textContent) title = tl.textContent.trim();
+      }
+
+      // fallback: tenta pelo texto do artist-link (pega só o primeiro)
+      if (!artist) {
+        var al = card.querySelector('.artist-link');
+        if (al && al.textContent) artist = al.textContent.trim();
+      }
+
+      return { artist: artist, title: title };
+    } catch (e) { return null; }
+  }
+
+  // =========================
+  // Neutralizar <a download>
   // =========================
   function neutralizeOne(link) {
     try {
       if (!link || !link.getAttribute) return;
-      // remover comportamentos que antecipam o download / nova aba
       link.removeAttribute('download');
       link.removeAttribute('target');
-      // (mantém href intacto)
     } catch (e) {}
   }
 
@@ -458,16 +569,25 @@
   }
 
   // =========================
-  // Interceptar evento (mais cedo que click)
+  // Interceptar evento
   // =========================
   function findDownloadLinkFromTarget(t) {
     try { return t && t.closest ? t.closest('.music-card .download') : null; } catch(e) {}
-    // fallback manual
     while (t && t.nodeType === 1) {
       if (t.matches && t.matches('.music-card .download')) return t;
       t = t.parentElement;
     }
     return null;
+  }
+
+  function clickNormal(url) {
+    // sem atributo download => servidor decide o filename bonitão
+    var a = document.createElement('a');
+    a.href = url;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   function intercept(e, phase) {
@@ -478,32 +598,23 @@
     if (!url) return;
 
     interceptCount++;
-    dlog('[bp-speed-download] intercept #' + interceptCount, { phase: phase, url: url });
+    var meta = getMetaFromLink(link);
+
+    dlog('[bp-speed-download] intercept #' + interceptCount, { phase: phase, url: url, meta: meta });
     debugBadge('INT ' + interceptCount);
 
-    // sempre neutraliza o link clicado
     neutralizeOne(link);
 
-    // preferência
     var pref = getPref();
 
-    // normal = deixa agir (mas como removemos download, vamos disparar manual)
     if (pref === 'normal') {
       e.preventDefault();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       if (e.stopPropagation) e.stopPropagation();
-
-      // dispara download normal manualmente (mesma URL, conta no worker)
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = baseName(url); // força "salvar como"
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      clickNormal(url);
       return;
     }
 
-    // speed = executa direto sem modal
     if (pref === 'speed') {
       e.preventDefault();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -515,6 +626,8 @@
       document.body.style.overflow = 'hidden';
 
       activeUrl = url;
+      activeMeta = meta;
+
       sdlProg.classList.add('show');
       setProgress(0.05, 'Baixando arquivo...');
       btnSpeed.classList.add('is-loading');
@@ -523,11 +636,10 @@
       return;
     }
 
-    // sem preferência = abre modal
     e.preventDefault();
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     if (e.stopPropagation) e.stopPropagation();
-    openModal(url);
+    openModal(url, meta);
   }
 
   // =========================
@@ -545,9 +657,7 @@
     debugBadge('READY');
   }
 
-  // 👇 intercepta o mais cedo possível
   document.addEventListener('pointerdown', function (e) { intercept(e, 'pointerdown'); }, true);
-  // backup
   document.addEventListener('click', function (e) { intercept(e, 'click'); }, true);
 
   if (document.readyState === 'loading') {
