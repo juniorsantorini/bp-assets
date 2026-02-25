@@ -192,10 +192,11 @@
     document.getElementById('bp-sdl-close').addEventListener('click', closeModal);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
 
-    btnNormal.addEventListener('click', function () {
-      btnNormal.href = activeUrl;
+    btnNormal.addEventListener('click', function (e) {
+      e.preventDefault();
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
       closeModal();
+      clickNormal(activeUrl);
     });
 
     btnSpeed.addEventListener('click', function () {
@@ -430,6 +431,10 @@
     return niceBaseNameFromMeta(url, meta) + '_speed.mp3';
   }
 
+  function normalName(url, meta) {
+    return niceBaseNameFromMeta(url, meta) + '.mp3';
+  }
+
   // =========================
   // Coletar meta do card
   // =========================
@@ -506,12 +511,26 @@
   }
 
   function clickNormal(url) {
-    var a = document.createElement('a');
-    a.href = url;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
+    fetch(fetchUrl)
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then(function (blob) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = normalName(url, activeMeta);
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+          try { URL.revokeObjectURL(a.href); } catch(e){}
+          try { document.body.removeChild(a); } catch(e){}
+        }, 1800);
+      })
+      .catch(function (err) {
+        console.error('bp-sdl normal download error:', err);
+      });
   }
 
   function intercept(e) {
