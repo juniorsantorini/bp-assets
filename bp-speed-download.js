@@ -1,57 +1,26 @@
 /**
- * bp-speed-download.js (DEBUG BUILD)
+ * bp-speed-download.js
  * Intercepta clique no "Baixar" dos music-cards e abre modal Normal/Speed.
  * Speed é gerado no navegador (OfflineAudioContext + lamejs).
  *
  * FIX:
  *  - Nome do arquivo SPEED no padrão bonito: "ARTISTA - TITULO [borapracima.site]__ID_speed.mp3"
  *    (usa data-artist / data-title do .music-card + __ID da URL)
- *  - "Lembrar minha escolha" agora pode marcar e DESMARCAR (de verdade).
- *
- * DEBUG: badge + logs + contador de intercept.
- * (Depois a gente remove o DEBUG fácil.)
+ *  - "Lembrar minha escolha" agora pode marcar e DESMARCAR (sem botão extra).
  */
 (function () {
   'use strict';
 
   // =========================
-  // DEBUG
-  // =========================
-  var DEBUG = true;
-  function dlog() { try { if (DEBUG) console.log.apply(console, arguments); } catch (e) {} }
-
-  function debugBadge(msg) {
-    if (!DEBUG) return;
-    try {
-      var el = document.getElementById('bp-sdl-badge');
-      if (!el) {
-        el = document.createElement('div');
-        el.id = 'bp-sdl-badge';
-        el.style.cssText =
-          'position:fixed;right:10px;bottom:10px;z-index:9999999;' +
-          'background:#a40781;color:#fff;font:700 11px/1 system-ui,Segoe UI,Roboto,Arial;' +
-          'padding:6px 8px;border-radius:10px;opacity:.88;pointer-events:none';
-        document.documentElement.appendChild(el);
-      }
-      el.textContent = msg;
-      clearTimeout(el._t);
-      el._t = setTimeout(function () { try { el.remove(); } catch(e){} }, 2000);
-    } catch (e) {}
-  }
-
-  // =========================
   // CONFIG
   // =========================
   var SPEED    = Math.pow(2, 133 / 1200);
-  var MP3_KBPS = 128;
+  var MP3_KBPS = 320;
   var LAME_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
 
   // Preferência e "lembrar"
   var LS_PREF     = 'bp_dl_pref';      // 'normal' | 'speed' | ''
   var LS_REMEMBER = 'bp_dl_remember';  // '1' | ''
-
-  dlog('[bp-speed-download] ATIVO (debug build)', { SPEED: SPEED, MP3_KBPS: MP3_KBPS });
-  debugBadge('SDL ON');
 
   // =========================
   // Preferência salva
@@ -104,7 +73,6 @@
       lameLoading = false;
       var q = lameQ.slice(); lameQ = [];
       q.forEach(function (f) { try { f(); } catch(e){} });
-      dlog('[bp-speed-download] lamejs OK');
     };
 
     s.onerror = function () {
@@ -112,7 +80,6 @@
       var err = new Error('lamejs não carregou');
       var q = lameQ.slice(); lameQ = [];
       q.forEach(function (f) { try { f(err); } catch(e){} });
-      dlog('[bp-speed-download] lamejs FAIL');
     };
 
     document.head.appendChild(s);
@@ -146,8 +113,6 @@
       '.sdl-remember{display:flex;align-items:center;gap:8px;padding:12px 4px 4px;border-top:1px solid rgba(255,255,255,.07);margin-top:6px}' +
       '.sdl-remember input[type=checkbox]{width:15px;height:15px;accent-color:#a40781;cursor:pointer;flex-shrink:0}' +
       '.sdl-remember label{font-size:11px;color:rgba(255,255,255,.4);cursor:pointer;user-select:none;flex:1}' +
-      '.sdl-remember .sdl-reset{margin-left:auto;font-size:10px;color:rgba(164,7,129,.7);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline;white-space:nowrap}' +
-      '.sdl-remember .sdl-reset:hover{color:#e070c8}' +
       '.sdl-prog{display:none;margin-top:16px}' +
       '.sdl-prog.show{display:block}' +
       '.sdl-prog-bar{height:3px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}' +
@@ -163,7 +128,6 @@
   var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel;
   var activeUrl = '';
   var activeMeta = null;
-  var interceptCount = 0;
 
   function buildModal() {
     if (document.getElementById('bp-sdl-overlay')) {
@@ -205,7 +169,6 @@
         '<div class="sdl-remember">' +
           '<input type="checkbox" id="bp-sdl-chk" />' +
           '<label for="bp-sdl-chk">Lembrar minha escolha</label>' +
-          '<button type="button" class="sdl-reset" id="bp-sdl-reset" style="display:none">Esquecer</button>' +
         '</div>' +
 
         '<div class="sdl-prog" id="bp-sdl-prog">' +
@@ -223,16 +186,12 @@
     sdlFill     = document.getElementById('bp-sdl-fill');
     sdlLabel    = document.getElementById('bp-sdl-label');
 
-    var btnReset = document.getElementById('bp-sdl-reset');
-
     document.getElementById('bp-sdl-close').addEventListener('click', closeModal);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
 
     btnNormal.addEventListener('click', function () {
-      // Se está marcando pra lembrar, salva a escolha atual
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
       closeModal();
-      // deixa o <a> agir (download normal via servidor)
     });
 
     btnSpeed.addEventListener('click', function () {
@@ -240,25 +199,13 @@
       runSpeedDownload(activeUrl);
     });
 
-    // Botão "Esquecer": limpa tudo e deixa checkbox desmarcado
-    btnReset.addEventListener('click', function (e) {
-      e.stopPropagation();
-      clearRememberAndPref();
-      chkRemember.checked = false;
-      btnReset.style.display = 'none';
-      updatePrefBadges();
-    });
-
-    // ✅ FIX: desmarcar realmente funciona
+    // ✅ Só desmarcar = esquecer tudo
     chkRemember.addEventListener('change', function () {
       if (chkRemember.checked) {
         setRemember(true);
       } else {
-        // desmarcou -> apaga preferencia e "lembrar"
         clearRememberAndPref();
         updatePrefBadges();
-        var r = document.getElementById('bp-sdl-reset');
-        if (r) r.style.display = 'none';
       }
     });
   }
@@ -277,19 +224,10 @@
     sdlLabel.textContent = 'Processando...';
     btnSpeed.classList.remove('is-loading');
 
-    // ✅ checkbox agora segue LS_REMEMBER (não LS_PREF)
-    var remember = getRemember();
-    chkRemember.checked = remember;
-
-    var pref = getPref();
-    var btnReset = document.getElementById('bp-sdl-reset');
-    btnReset.style.display = pref ? 'inline' : 'none';
+    chkRemember.checked = getRemember();
 
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
-
-    dlog('[bp-speed-download] modal OPEN', url, meta);
-    debugBadge('MODAL');
   }
 
   function closeModal() {
@@ -364,7 +302,7 @@
 
         setProgress(0.35, 'Renderizando...');
         offline.startRendering().then(function (rendered) {
-          setProgress(0.65, 'Codificando MP3...');
+          setProgress(0.65, 'Preparando versão Speed — renderizando em alta qualidade...');
 
           loadLame(function (err) {
             if (err) { reject(err); return; }
@@ -404,11 +342,7 @@
     sdlProg.classList.add('show');
     setProgress(0.05, 'Baixando arquivo...');
 
-    // mantém seu padrão ?dl=1 (conta no servidor)
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
-
-    dlog('[bp-speed-download] speed START', fetchUrl);
-    debugBadge('SPEED…');
 
     fetch(fetchUrl)
       .then(function (res) {
@@ -422,8 +356,6 @@
 
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-
-        // ✅ nome bonito
         a.download = speedName(url, activeMeta);
 
         document.body.appendChild(a);
@@ -436,11 +368,9 @@
         }, 1800);
       })
       .catch(function (err) {
-        dlog('[bp-speed-download] speed ERROR', err);
         sdlFill.style.width = '0%';
         sdlLabel.textContent = '❌ ' + (err.message || 'Erro no processamento');
         btnSpeed.classList.remove('is-loading');
-        debugBadge('ERR');
       });
   }
 
@@ -453,23 +383,19 @@
   }
 
   function extractIdFromFilename(fn) {
-    // pega o que vem depois de "__" (antes do .mp3)
-    // exemplo: "...__xpj4k18l.mp3" -> "xpj4k18l"
     var m = String(fn || '').match(/__([a-z0-9_-]+)\.mp3$/i);
     return m ? m[1] : '';
   }
 
   function sanitizeFilenamePart(s) {
     s = String(s || '').trim();
-    // remove caracteres ruins pro Windows
     s = s.replace(/[\\\/:*?"<>|]+/g, '');
-    // normaliza espaços
     s = s.replace(/\s+/g, ' ').trim();
     return s;
   }
 
   function niceBaseNameFromMeta(url, meta) {
-    var fn = baseName(url); // filename da URL
+    var fn = baseName(url);
     var id = extractIdFromFilename(fn);
 
     var artist = meta && meta.artist ? meta.artist : '';
@@ -478,9 +404,7 @@
     artist = sanitizeFilenamePart(artist);
     title  = sanitizeFilenamePart(title);
 
-    // fallback se não achar meta
     if (!artist && !title) {
-      // tenta tirar "__id" do nome cru
       var raw = fn.replace(/\.mp3$/i, '');
       raw = raw.replace(/__([a-z0-9_-]+)$/i, '');
       raw = sanitizeFilenamePart(raw);
@@ -513,13 +437,11 @@
       var artist = (card.dataset && (card.dataset.artist || card.getAttribute('data-artist'))) || '';
       var title  = (card.dataset && (card.dataset.title  || card.getAttribute('data-title')))  || '';
 
-      // fallback: tenta pelo texto do title-link
       if (!title) {
         var tl = card.querySelector('.title-link');
         if (tl && tl.textContent) title = tl.textContent.trim();
       }
 
-      // fallback: tenta pelo texto do artist-link (pega só o primeiro)
       if (!artist) {
         var al = card.querySelector('.artist-link');
         if (al && al.textContent) artist = al.textContent.trim();
@@ -564,7 +486,6 @@
         }
       });
       mo.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['download','target'] });
-      dlog('[bp-speed-download] MutationObserver ON');
     } catch (e) {}
   }
 
@@ -581,7 +502,6 @@
   }
 
   function clickNormal(url) {
-    // sem atributo download => servidor decide o filename bonitão
     var a = document.createElement('a');
     a.href = url;
     a.rel = 'noopener';
@@ -590,18 +510,14 @@
     document.body.removeChild(a);
   }
 
-  function intercept(e, phase) {
+  function intercept(e) {
     var link = findDownloadLinkFromTarget(e.target);
     if (!link) return;
 
     var url = link.getAttribute('href') || '';
     if (!url) return;
 
-    interceptCount++;
     var meta = getMetaFromLink(link);
-
-    dlog('[bp-speed-download] intercept #' + interceptCount, { phase: phase, url: url, meta: meta });
-    debugBadge('INT ' + interceptCount);
 
     neutralizeOne(link);
 
@@ -652,13 +568,10 @@
 
     neutralizeAll();
     watchMutations();
-
-    dlog('[bp-speed-download] init OK');
-    debugBadge('READY');
   }
 
-  document.addEventListener('pointerdown', function (e) { intercept(e, 'pointerdown'); }, true);
-  document.addEventListener('click', function (e) { intercept(e, 'click'); }, true);
+  document.addEventListener('pointerdown', function (e) { intercept(e); }, true);
+  document.addEventListener('click', function (e) { intercept(e); }, true);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
