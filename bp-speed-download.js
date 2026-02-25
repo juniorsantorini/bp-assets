@@ -302,17 +302,9 @@
   // Badge de preferência no botão Baixar
   // =========================
   function updatePrefBadges() {
-    var pref = getPref();
     document.querySelectorAll('.music-card .download').forEach(function (link) {
       var old = link.querySelector('.bp-dl-pref-tag');
       if (old) old.parentNode.removeChild(old);
-      if (pref) {
-        var tag = document.createElement('span');
-        tag.className = 'bp-dl-pref-tag';
-        tag.textContent = pref === 'speed' ? '⚡' : '↓';
-        tag.title = pref === 'speed' ? 'Preferência: Speed' : 'Preferência: Normal';
-        link.appendChild(tag);
-      }
     });
   }
 
