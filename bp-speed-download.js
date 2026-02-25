@@ -648,7 +648,6 @@
     watchMutations();
   }
 
-  document.addEventListener('pointerdown', function (e) { intercept(e); }, true);
   document.addEventListener('click', function (e) { intercept(e); }, true);
 
   if (document.readyState === 'loading') {
