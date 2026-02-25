@@ -196,8 +196,10 @@
       e.preventDefault();
       if (Date.now() - modalOpenTime < 2000) return;
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
+      var url  = activeUrl;
+      var meta = activeMeta;
       closeModal();
-      clickNormal(activeUrl);
+      clickNormal(url, meta);
     });
 
     btnSpeed.addEventListener('click', function () {
@@ -515,7 +517,7 @@
     return null;
   }
 
-  function clickNormal(url) {
+  function clickNormal(url, meta) {
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
     fetch(fetchUrl)
       .then(function (res) {
@@ -525,7 +527,7 @@
       .then(function (blob) {
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = normalName(url, activeMeta);
+        a.download = normalName(url, meta);
         document.body.appendChild(a);
         a.click();
         setTimeout(function () {
@@ -555,8 +557,7 @@
       e.preventDefault();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       if (e.stopPropagation) e.stopPropagation();
-      activeMeta = meta;
-      clickNormal(url);
+      clickNormal(url, meta);
       return;
     }
 
