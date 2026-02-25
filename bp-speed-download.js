@@ -194,12 +194,14 @@
 
     btnNormal.addEventListener('click', function (e) {
       e.preventDefault();
+      if (Date.now() - modalOpenTime < 2000) return;
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
       closeModal();
       clickNormal(activeUrl);
     });
 
     btnSpeed.addEventListener('click', function () {
+      if (Date.now() - modalOpenTime < 2000) return;
       if (chkRemember.checked) { setRemember(true); setPref('speed'); updatePrefBadges(); }
       runSpeedDownload(activeUrl);
     });
@@ -214,6 +216,8 @@
       }
     });
   }
+
+  var modalOpenTime = 0;
 
   function openModal(url, meta) {
     injectCSS();
@@ -233,6 +237,7 @@
 
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
+    modalOpenTime = Date.now();
   }
 
   function closeModal() {
@@ -550,6 +555,7 @@
       e.preventDefault();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       if (e.stopPropagation) e.stopPropagation();
+      activeMeta = meta;
       clickNormal(url);
       return;
     }
