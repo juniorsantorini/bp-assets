@@ -144,8 +144,10 @@
       '#bp-toast-footer{display:flex;justify-content:space-between;align-items:center;margin-top:7px}' +
       '#bp-toast-pct{font-size:12px;font-weight:800;color:#e070c8}' +
       '#bp-toast-status{font-size:10px;color:rgba(255,255,255,.35);text-align:right}' +
-      '#bp-toast-queue{display:none;font-size:10px;color:rgba(255,255,255,.35);margin-top:5px}' +
+      '#bp-toast-queue{display:none;font-size:11px;font-weight:700;color:#e070c8;margin-top:7px;letter-spacing:.2px}' +
       '#bp-toast-queue.show{display:block}' +
+      '@keyframes bp-dedup-flash{0%,100%{opacity:1}30%{opacity:.3}60%{opacity:.85}}' +
+      '.bp-dedup-flash{animation:bp-dedup-flash .5s ease both!important}' +
       '#bp-toast-switch{display:none;background:none;border:none;padding:0;font-size:10px;color:rgba(164,7,129,.8);cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:2px;margin-top:6px;letter-spacing:.2px}' +
       '#bp-toast-switch:hover{color:#e070c8}' +
       '#bp-toast-switch.show{display:inline-block}' +
@@ -166,6 +168,11 @@
   var currentMeta = null;
   var activeUrl = '';
   var activeMeta = null;
+
+  // Crawl da barra de progresso
+  var barCurrent = 0;   // % atual exibida (0-100)
+  var barTarget  = 0;   // teto que o crawl persegue (0-100)
+  var barRaf     = null;
 
   function buildModal() {
     if (document.getElementById('bp-sdl-overlay')) {
@@ -316,9 +323,28 @@
   // Fila de downloads
   // =========================
   function enqueue(url, meta, type) {
+    // Dedup: URL já rodando ou já na fila
+    if (dlRunning && activeUrl === url) { flashDuped(url); return; }
+    for (var i = 0; i < dlQueue.length; i++) {
+      if (dlQueue[i].url === url) { flashDuped(url); return; }
+    }
     dlQueue.push({ url: url, meta: meta, type: type });
     updateQueueBadge();
     if (!dlRunning) processNext();
+  }
+
+  function flashDuped(url) {
+    // Pisca o botão do card correspondente
+    try {
+      document.querySelectorAll('.music-card .download').forEach(function (link) {
+        if ((link.getAttribute('href') || '') === url) {
+          link.classList.remove('bp-dedup-flash');
+          void link.offsetWidth;
+          link.classList.add('bp-dedup-flash');
+          setTimeout(function () { link.classList.remove('bp-dedup-flash'); }, 600);
+        }
+      });
+    } catch(e) {}
   }
 
   function processNext() {
@@ -342,8 +368,11 @@
     var el = document.getElementById('bp-toast-queue');
     if (!el) return;
     var n = dlQueue.length;
-    if (n > 0) {
-      el.textContent = '🎵 +' + n + ' na fila';
+    if (n === 1) {
+      el.textContent = '🎵 mais 1 na fila';
+      el.classList.add('show');
+    } else if (n > 1) {
+      el.textContent = '🎵 mais ' + n + ' na fila';
       el.classList.add('show');
     } else {
       el.textContent = '';
@@ -445,6 +474,38 @@
     if (toastStatus && msg) toastStatus.textContent = msg;
   }
 
+  function setProgressToast(pct, msg, crawlCeiling) {
+    // pct: valor real do checkpoint (0-1)
+    // crawlCeiling: até onde rasteja enquanto espera o próximo checkpoint (0-1, opcional)
+    barCurrent = pct * 100;
+    barTarget  = (crawlCeiling !== undefined ? crawlCeiling : pct) * 100;
+    applyBarWidth(barCurrent);
+    if (toastStatus && msg) toastStatus.textContent = msg;
+    if (barTarget > barCurrent && !barRaf) barRaf = requestAnimationFrame(barCrawlStep);
+  }
+
+  function barCrawlStep() {
+    if (barCurrent >= barTarget) { barRaf = null; return; }
+    var diff = barTarget - barCurrent;
+    // Velocidade: rápida quando longe, lenta quando perto — nunca chega no teto
+    var step = Math.max(0.04, diff * 0.012);
+    barCurrent = Math.min(barTarget - 0.1, barCurrent + step);
+    applyBarWidth(barCurrent);
+    barRaf = requestAnimationFrame(barCrawlStep);
+  }
+
+  function applyBarWidth(pct) {
+    var w = pct.toFixed(1) + '%';
+    if (toastFill) toastFill.style.width = w;
+    if (toastPct)  toastPct.textContent  = Math.round(pct) + '%';
+  }
+
+  function stopCrawl() {
+    if (barRaf) { cancelAnimationFrame(barRaf); barRaf = null; }
+    barCurrent = 0;
+    barTarget  = 0;
+  }
+
   function showToast(title, filename) {
     if (!toastEl) return;
     if (toastTitle) toastTitle.textContent = title || 'Baixando…';
@@ -458,6 +519,7 @@
   }
 
   function hideToast() {
+    stopCrawl();
     if (toastEl) toastEl.classList.remove('show');
     var ts = document.getElementById('bp-toast-switch');
     if (ts) ts.classList.remove('show');
@@ -490,9 +552,9 @@
         src.connect(offline.destination);
         src.start(0);
 
-        setProgress(0.35, 'Renderizando…');
+        setProgressToast(0.35, 'Renderizando…', 0.62);
         offline.startRendering().then(function (rendered) {
-          setProgress(0.65, 'Convertendo para MP3…');
+          setProgressToast(0.65, 'Convertendo para MP3…', 0.95);
 
           loadLame(function (err) {
             if (err) { reject(err); return; }
@@ -531,29 +593,16 @@
     currentMeta = activeMeta;
     var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Normal';
     showToast('⬇️ Baixando faixa', fname);
-    if (sdlDlHeader) sdlDlHeader.textContent = 'Baixando…';
-    if (sdlDlFile)   sdlDlFile.textContent   = fname;
-    // Hide modal title/sub, show clean download card
-    var h3 = overlay.querySelector('#bp-sdl-modal h3');
-    var sub = overlay.querySelector('.sdl-sub');
-    if (h3)  h3.style.display  = 'none';
-    if (sub) sub.style.display = 'none';
-    // Esconde opções, mostra só barra no modal
-    btnNormal.style.display = 'none';
-    btnSpeed.style.display  = 'none';
-    document.querySelector('.sdl-remember').style.display = 'none';
-    btnSwitch.classList.add('show');
-    sdlProg.classList.add('show');
-    setProgress(0.05, 'Baixando…');
+    setProgressToast(0.05, 'Baixando…', 0.75);
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
     fetch(fetchUrl)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        setProgress(0.8, 'Quase lá…');
+        setProgressToast(0.8, 'Quase lá…', 0.95);
         return res.blob();
       })
       .then(function (blob) {
-        setProgress(1, 'Pronto ✔');
+        setProgressToast(1, 'Pronto ✔');
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = normalName(url, activeMeta);
@@ -571,10 +620,8 @@
       })
       .catch(function (err) {
         dlRunning = false;
-        sdlFill.style.width = '0%';
         if (toastFill) toastFill.style.width = '0%';
-        if (toastStatus) toastStatus.textContent = '❌ Erro';
-        sdlLabel.textContent = '❌ ' + (err.message || 'Erro no download');
+        if (toastStatus) toastStatus.textContent = '❌ ' + (err.message || 'Erro no download');
         setTimeout(processNext, 2000);
       });
   }
@@ -584,32 +631,19 @@
     dlRunning = true;
     var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Speed';
     showToast('⚡ Processando Speed', fname);
-    if (sdlDlHeader) { sdlDlHeader.textContent = '⚡ Speed'; sdlDlHeader.classList.add('is-speed'); }
-    if (sdlDlFile)   sdlDlFile.textContent = fname;
-    var h3 = overlay.querySelector('#bp-sdl-modal h3');
-    var sub = overlay.querySelector('.sdl-sub');
-    if (h3)  h3.style.display  = 'none';
-    if (sub) sub.style.display = 'none';
-    btnSpeed.classList.add('is-loading');
-    sdlProg.classList.add('show');
-    // Esconde opções, mostra só barra no modal
-    btnNormal.style.display = 'none';
-    btnSpeed.style.display  = 'none';
-    document.querySelector('.sdl-remember').style.display = 'none';
-    btnSwitch.classList.add('show');
-    setProgress(0.05, 'Baixando…');
+    setProgressToast(0.05, 'Baixando…', 0.18);
 
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
 
     fetch(fetchUrl)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        setProgress(0.2, 'Acelerando o áudio…');
+        setProgressToast(0.2, 'Acelerando o áudio…', 0.33);
         return res.arrayBuffer();
       })
       .then(applySpeed)
       .then(function (blob) {
-        setProgress(1, 'Pronto ✔');
+        setProgressToast(1, 'Pronto ✔');
 
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -628,11 +662,8 @@
       })
       .catch(function (err) {
         dlRunning = false;
-        sdlFill.style.width = '0%';
         if (toastFill) toastFill.style.width = '0%';
-        if (toastStatus) toastStatus.textContent = '❌ Erro';
-        sdlLabel.textContent = '❌ ' + (err.message || 'Erro no processamento');
-        btnSpeed.classList.remove('is-loading');
+        if (toastStatus) toastStatus.textContent = '❌ ' + (err.message || 'Erro no processamento');
         setTimeout(processNext, 2000);
       });
   }
