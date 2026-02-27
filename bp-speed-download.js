@@ -15,7 +15,7 @@
   // CONFIG
   // =========================
   var SPEED    = Math.pow(2, 133 / 1200);
-  var MP3_KBPS = 256;
+  var MP3_KBPS = 320;
   var LAME_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
 
   // Preferência e "lembrar"
@@ -378,6 +378,11 @@
       el.textContent = '';
       el.classList.remove('show');
     }
+    // Atualiza título do toast em tempo real se ele está visível
+    if (toastEl && toastEl.classList.contains('show') && toastTitle && dlRunning) {
+      var cur = toastTitle.textContent.split(' · ')[0]; // parte base sem o contador
+      toastTitle.textContent = n > 0 ? cur + ' · +' + n + ' NA FILA' : cur;
+    }
   }
 
   function resetModalToChoice() {
@@ -583,16 +588,20 @@
     barTarget  = 0;
   }
 
-  function showToast(title, filename) {
+  function showToast(title, filename, pendingAfterThis) {
     if (!toastEl) return;
-    if (toastTitle) toastTitle.textContent = title || 'Baixando…';
+    var label = title;
+    if (pendingAfterThis && pendingAfterThis > 0) {
+      label = title + ' · +' + pendingAfterThis + ' NA FILA';
+    }
+    if (toastTitle) toastTitle.textContent = label;
     if (toastFile)  toastFile.textContent  = filename || '';
     if (toastFill)  toastFill.style.width  = '0%';
     if (toastPct)   toastPct.textContent   = '0%';
-    // Remove and re-add to retrigger animation
     toastEl.classList.remove('show');
     void toastEl.offsetWidth;
     toastEl.classList.add('show');
+    updateQueueBadge();
   }
 
   function hideToast() {
@@ -645,10 +654,11 @@
   function runNormalDownload(url) {
     if (!url) return;
     dlRunning = true;
-    var meta = activeMeta; // captura local — imune a closeModal
+    var meta = activeMeta;
     currentMeta = meta;
+    var queueTotal = dlQueue.length; // quantas ainda esperam depois desta
     var fname = meta && meta.title ? (meta.artist ? meta.artist + ' — ' + meta.title : meta.title) : 'Versão Normal';
-    showToast('⬇️ Baixando faixa', fname);
+    showToast('⬇️ BAIXANDO FAIXA', fname, queueTotal);
     setProgressToast(0.05, 'Baixando…', 0.75);
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
     fetch(fetchUrl)
@@ -669,10 +679,13 @@
           try { document.body.removeChild(a); } catch(e){}
         }, 400);
         setTimeout(function () {
-          hideToast();
-          closeModal();
-          processNext();
-        }, 2800);
+          if (dlQueue.length > 0) {
+            processNext(); // próximo item — showToast vai atualizar o toast
+          } else {
+            dlRunning = false;
+            hideToast();
+          }
+        }, 1200);
       })
       .catch(function (err) {
         dlRunning = false;
@@ -684,9 +697,10 @@
   function runSpeedDownload(url) {
     if (!url) return;
     dlRunning = true;
-    var meta = activeMeta; // captura local — imune a closeModal
+    var meta = activeMeta;
+    var queueTotal = dlQueue.length;
     var fname = meta && meta.title ? (meta.artist ? meta.artist + ' — ' + meta.title : meta.title) : 'Versão Speed';
-    showToast('⚡ Processando Speed', fname);
+    showToast('⚡ PROCESSANDO SPEED', fname, queueTotal);
     setProgressToast(0.05, 'Baixando…', 0.18);
 
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
@@ -711,9 +725,12 @@
         setTimeout(function () {
           try { URL.revokeObjectURL(a.href); } catch(e){}
           try { document.body.removeChild(a); } catch(e){}
-          hideToast();
-          closeModal();
-          processNext();
+          if (dlQueue.length > 0) {
+            processNext();
+          } else {
+            dlRunning = false;
+            hideToast();
+          }
         }, 1800);
       })
       .catch(function (err) {
