@@ -15,7 +15,7 @@
   // CONFIG
   // =========================
   var SPEED    = Math.pow(2, 133 / 1200);
-  var MP3_KBPS = 320;
+  var MP3_KBPS = 256;
   var LAME_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
 
   // Preferência e "lembrar"
@@ -431,14 +431,16 @@
     if (!overlay) return;
     overlay.classList.remove('show');
     document.body.style.overflow = '';
-    // Sempre mostra toast se download em andamento (mobile e desktop)
     if (dlRunning && toastEl) {
       toastEl.classList.remove('show');
       void toastEl.offsetWidth;
       toastEl.classList.add('show');
     }
-    activeUrl = '';
-    activeMeta = null;
+    // Só limpa se não tem download rodando — runners capturam meta localmente
+    if (!dlRunning) {
+      activeUrl  = '';
+      activeMeta = null;
+    }
   }
 
   // =========================
@@ -454,13 +456,88 @@
   // =========================
   // Áudio (Speed)
   // =========================
-  function f32ToI16(buf) {
-    var out = new Int16Array(buf.length);
-    for (var i = 0; i < buf.length; i++) {
-      var v = Math.max(-1, Math.min(1, buf[i]));
-      out[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;
-    }
-    return out;
+  // Worker inline — f32ToI16 + lamejs encoding rodam fora do main thread
+  var _speedWorker = null;
+  var _speedWorkerReady = false;
+
+  function getSpeedWorker() {
+    if (_speedWorker) return _speedWorker;
+    var code = [
+      '(function(){',
+      '  var lamejsCDN = "' + LAME_CDN + '";',
+      '  var lameReady = false;',
+      '  function ensureLame(cb) {',
+      '    if (lameReady) { cb(); return; }',
+      '    try { importScripts(lamejsCDN); lameReady = true; cb(); }',
+      '    catch(e) { self.postMessage({ error: "lamejs nao carregou: " + e.message }); }',
+      '  }',
+      '  function f32ToI16(buf) {',
+      '    var out = new Int16Array(buf.length);',
+      '    for (var i = 0; i < buf.length; i++) {',
+      '      var v = Math.max(-1, Math.min(1, buf[i]));',
+      '      out[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;',
+      '    }',
+      '    return out;',
+      '  }',
+      '  self.onmessage = function(e) {',
+      '    var d = e.data;',
+      '    ensureLame(function() {',
+      '      try {',
+      '        var stereo = d.channels >= 2;',
+      '        var enc = new lamejs.Mp3Encoder(stereo ? 2 : 1, d.sampleRate, d.kbps);',
+      '        var L = f32ToI16(new Float32Array(d.left));',
+      '        var R = stereo ? f32ToI16(new Float32Array(d.right)) : null;',
+      '        var BLK = 1152, parts = [];',
+      '        for (var i = 0; i < L.length; i += BLK) {',
+      '          var lc = L.subarray(i, i + BLK);',
+      '          var b = stereo ? enc.encodeBuffer(lc, R.subarray(i, i + BLK)) : enc.encodeBuffer(lc);',
+      '          if (b.length) parts.push(new Uint8Array(b));',
+      '        }',
+      '        var tail = enc.flush();',
+      '        if (tail.length) parts.push(new Uint8Array(tail));',
+      '        var total = parts.reduce(function(s,p){return s+p.length;},0);',
+      '        var out = new Uint8Array(total); var offset = 0;',
+      '        parts.forEach(function(p){out.set(p,offset);offset+=p.length;});',
+      '        self.postMessage({ mp3: out.buffer }, [out.buffer]);',
+      '      } catch(e) { self.postMessage({ error: e.message }); }',
+      '    });',
+      '  };',
+      '})()'
+    ].join('\n');
+    try {
+      var blob = new Blob([code], { type: 'application/javascript' });
+      _speedWorker = new Worker(URL.createObjectURL(blob));
+    } catch(e) { _speedWorker = null; }
+    return _speedWorker;
+  }
+
+  function encodeWithWorker(rendered, ch, sr) {
+    return new Promise(function(resolve, reject) {
+      var worker = getSpeedWorker();
+      if (!worker) { reject(new Error('Web Worker não suportado')); return; }
+
+      // Copia os buffers — necessário para transferência
+      var left  = rendered.getChannelData(0).buffer.slice(0);
+      var right = ch >= 2 ? rendered.getChannelData(1).buffer.slice(0) : null;
+
+      var transferable = right ? [left, right] : [left];
+
+      worker.onmessage = function(e) {
+        if (e.data.error) { reject(new Error(e.data.error)); return; }
+        resolve(new Blob([e.data.mp3], { type: 'audio/mpeg' }));
+      };
+      worker.onerror = function(e) {
+        reject(new Error(e.message || 'Erro no worker'));
+      };
+
+      worker.postMessage({
+        left: left,
+        right: right,
+        channels: ch,
+        sampleRate: sr,
+        kbps: MP3_KBPS
+      }, transferable);
+    });
   }
 
   function setProgress(pct, msg) {
@@ -555,30 +632,8 @@
         setProgressToast(0.35, 'Renderizando…', 0.62);
         offline.startRendering().then(function (rendered) {
           setProgressToast(0.65, 'Convertendo para MP3…', 0.95);
-
-          loadLame(function (err) {
-            if (err) { reject(err); return; }
-
-            try {
-              var stereo = ch >= 2;
-              var enc = new lamejs.Mp3Encoder(stereo ? 2 : 1, sr, MP3_KBPS);
-
-              var L = f32ToI16(rendered.getChannelData(0));
-              var R = stereo ? f32ToI16(rendered.getChannelData(1)) : null;
-
-              var BLK = 1152, parts = [];
-              for (var i = 0; i < L.length; i += BLK) {
-                var lc = L.subarray(i, i + BLK);
-                var buf = stereo ? enc.encodeBuffer(lc, R.subarray(i, i + BLK)) : enc.encodeBuffer(lc);
-                if (buf.length) parts.push(buf);
-              }
-
-              var tail = enc.flush();
-              if (tail.length) parts.push(tail);
-
-              resolve(new Blob(parts, { type: 'audio/mpeg' }));
-            } catch (e) { reject(e); }
-          });
+          // Encoding no Web Worker — não trava o main thread
+          encodeWithWorker(rendered, ch, sr).then(resolve).catch(reject);
         }).catch(reject);
       }, function () {
         try { ctx.close(); } catch(e){}
@@ -590,8 +645,9 @@
   function runNormalDownload(url) {
     if (!url) return;
     dlRunning = true;
-    currentMeta = activeMeta;
-    var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Normal';
+    var meta = activeMeta; // captura local — imune a closeModal
+    currentMeta = meta;
+    var fname = meta && meta.title ? (meta.artist ? meta.artist + ' — ' + meta.title : meta.title) : 'Versão Normal';
     showToast('⬇️ Baixando faixa', fname);
     setProgressToast(0.05, 'Baixando…', 0.75);
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
@@ -605,7 +661,7 @@
         setProgressToast(1, 'Pronto ✔');
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = normalName(url, activeMeta);
+        a.download = normalName(url, meta);
         document.body.appendChild(a);
         a.click();
         setTimeout(function () {
@@ -620,16 +676,16 @@
       })
       .catch(function (err) {
         dlRunning = false;
-        if (toastFill) toastFill.style.width = '0%';
         if (toastStatus) toastStatus.textContent = '❌ ' + (err.message || 'Erro no download');
-        setTimeout(processNext, 2000);
+        setTimeout(function() { hideToast(); processNext(); }, 2000);
       });
   }
 
   function runSpeedDownload(url) {
     if (!url) return;
     dlRunning = true;
-    var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Speed';
+    var meta = activeMeta; // captura local — imune a closeModal
+    var fname = meta && meta.title ? (meta.artist ? meta.artist + ' — ' + meta.title : meta.title) : 'Versão Speed';
     showToast('⚡ Processando Speed', fname);
     setProgressToast(0.05, 'Baixando…', 0.18);
 
@@ -647,7 +703,7 @@
 
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = speedName(url, activeMeta);
+        a.download = speedName(url, meta);
 
         document.body.appendChild(a);
         a.click();
@@ -662,9 +718,8 @@
       })
       .catch(function (err) {
         dlRunning = false;
-        if (toastFill) toastFill.style.width = '0%';
         if (toastStatus) toastStatus.textContent = '❌ ' + (err.message || 'Erro no processamento');
-        setTimeout(processNext, 2000);
+        setTimeout(function() { hideToast(); processNext(); }, 2000);
       });
   }
 
