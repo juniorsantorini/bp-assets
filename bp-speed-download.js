@@ -95,12 +95,12 @@
     s.textContent =
       '#bp-sdl-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .22s ease}' +
       '#bp-sdl-overlay.show{opacity:1;pointer-events:auto}' +
-      '#bp-sdl-modal{background:linear-gradient(150deg,#1c0e1a 0%,#120b10 100%);border:1px solid rgba(164,7,129,.3);border-radius:22px;padding:28px 24px 20px;width:100%;max-width:340px;position:relative;box-shadow:0 28px 72px rgba(0,0,0,.75);transform:translateY(20px) scale(.96);transition:transform .25s cubic-bezier(.34,1.56,.64,1);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
+      '#bp-sdl-modal{background:linear-gradient(150deg,#1e0f1c 0%,#110a0f 100%);border:1px solid rgba(164,7,129,.35);border-radius:24px;padding:26px 22px 20px;width:100%;max-width:340px;position:relative;box-shadow:0 32px 80px rgba(0,0,0,.8),0 0 0 1px rgba(164,7,129,.08);transform:translateY(20px) scale(.96);transition:transform .25s cubic-bezier(.34,1.56,.64,1);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
       '#bp-sdl-overlay.show #bp-sdl-modal{transform:translateY(0) scale(1)}' +
-      '#bp-sdl-modal h3{font-size:15px;font-weight:800;color:#fff;margin:0 0 4px;letter-spacing:.2px}' +
-      '#bp-sdl-modal .sdl-sub{font-size:12px;color:rgba(255,255,255,.38);margin:0 0 20px}' +
-      '#bp-sdl-close{position:absolute;top:14px;right:16px;background:none;border:none;color:rgba(255,255,255,.3);font-size:17px;cursor:pointer;padding:4px 6px;line-height:1;transition:color .15s}' +
-      '#bp-sdl-close:hover{color:#fff}' +
+      '#bp-sdl-modal h3{font-size:16px;font-weight:800;color:#fff;margin:0 0 2px;letter-spacing:.1px}' +
+      '#bp-sdl-modal .sdl-sub{font-size:11px;color:rgba(255,255,255,.3);margin:0 0 18px;letter-spacing:.2px}' +
+      '#bp-sdl-close{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:50%;width:26px;height:26px;color:rgba(255,255,255,.4);font-size:13px;cursor:pointer;padding:0;line-height:26px;text-align:center;transition:background .15s,color .15s}' +
+      '#bp-sdl-close:hover{background:rgba(255,255,255,.14);color:#fff}' +
       '.sdl-opt{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.09);border-radius:14px;cursor:pointer;text-align:left;margin-bottom:10px;transition:background .18s,border-color .18s,transform .18s;font-family:inherit;text-decoration:none;box-sizing:border-box;color:#fff}' +
       '.sdl-opt:hover{background:rgba(164,7,129,.18);border-color:rgba(164,7,129,.45);transform:translateY(-2px)}' +
       '.sdl-opt:active{transform:translateY(0)}' +
@@ -116,11 +116,27 @@
       '.sdl-remember input[type=checkbox]:checked{background:#a40781;border-color:#a40781}' +
       '.sdl-remember input[type=checkbox]:checked::after{content:"";display:block;width:4px;height:8px;border:2px solid #fff;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-1px)}' +
       '.sdl-remember label{font-size:11px;color:rgba(255,255,255,.4);cursor:pointer;user-select:none;flex:1}' +
-      '.sdl-prog{display:none;margin-top:16px}' +
+      '@keyframes bp-shine{0%{background-position:200% center}100%{background-position:-200% center}}' +
+      '@keyframes bp-glow{0%,100%{box-shadow:0 0 6px rgba(164,7,129,.5)}50%{box-shadow:0 0 14px rgba(224,112,200,.8)}}' +
+      '@keyframes bp-toast-in{0%{opacity:0;transform:translateY(16px) scale(.96)}100%{opacity:1;transform:translateY(0) scale(1)}}' +
+      '.sdl-prog{display:none;margin-top:20px}' +
       '.sdl-prog.show{display:block}' +
-      '.sdl-prog-bar{height:3px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}' +
-      '.sdl-prog-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#a40781,#e070c8);transition:width .35s ease}' +
-      '.sdl-prog-label{font-size:11px;color:rgba(255,255,255,.38);margin-top:8px;text-align:center}' +
+      '.sdl-prog-bar{height:6px;background:rgba(255,255,255,.07);border-radius:999px;overflow:visible;position:relative}' +
+      '.sdl-prog-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#6b0057,#a40781 40%,#e070c8 70%,#f9a8e8);background-size:300% auto;transition:width .45s cubic-bezier(.4,0,.2,1);animation:bp-shine 2s linear infinite;position:relative}' +
+      '.sdl-prog-fill::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:#e070c8;animation:bp-glow 1.4s ease-in-out infinite;transition:opacity .3s}' +
+      '.sdl-prog-label{font-size:11px;color:rgba(255,255,255,.38);margin-top:10px;text-align:center}' +
+      '#bp-toast{position:fixed;bottom:28px;right:24px;width:300px;background:linear-gradient(150deg,#1c0e1a,#120b10);border:1px solid rgba(164,7,129,.4);border-radius:18px;padding:18px 20px 16px;box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 0 1px rgba(164,7,129,.1);z-index:9999998;display:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:bp-toast-in .28s cubic-bezier(.34,1.56,.64,1) both}' +
+      '#bp-toast.show{display:block}' +
+      '#bp-toast-close{position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(255,255,255,.3);font-size:15px;cursor:pointer;padding:2px 5px;line-height:1;transition:color .15s}' +
+      '#bp-toast-close:hover{color:#fff}' +
+      '#bp-toast-title{font-size:13px;font-weight:700;color:#e070c8;margin:0 20px 2px 0;letter-spacing:.1px}' +
+      '#bp-toast-file{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '#bp-toast-bar{height:5px;background:rgba(255,255,255,.07);border-radius:999px;overflow:visible;position:relative}' +
+      '#bp-toast-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#6b0057,#a40781 40%,#e070c8 70%,#f9a8e8);background-size:300% auto;transition:width .45s cubic-bezier(.4,0,.2,1);animation:bp-shine 2s linear infinite;position:relative}' +
+      '#bp-toast-fill::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:#e070c8;animation:bp-glow 1.4s ease-in-out infinite}' +
+      '#bp-toast-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px}' +
+      '#bp-toast-pct{font-size:11px;font-weight:700;color:#a40781}' +
+      '#bp-toast-status{font-size:11px;color:rgba(255,255,255,.3)}' +
       '.bp-dl-pref-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:4px;background:rgba(164,7,129,.25);border:1px solid rgba(164,7,129,.4);color:#e070c8;font-weight:700;letter-spacing:.4px;pointer-events:none}' +
       '.sdl-switch{display:none;width:100%;margin-top:14px;padding:11px 16px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);border-radius:14px;color:rgba(255,255,255,.65);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .18s,border-color .18s}' +
       '.sdl-switch:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}' +
@@ -132,6 +148,9 @@
   // Modal
   // =========================
   var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel, btnSwitch, btnClose;
+  var toastEl, toastFill, toastPct, toastStatus, toastTitle, toastFile;
+  var downloadInProgress = false;
+  var currentMeta = null;
   var activeUrl = '';
   var activeMeta = null;
 
@@ -188,6 +207,32 @@
 
     document.body.appendChild(overlay);
 
+    // Toast card (visible when modal is closed, desktop)
+    if (!document.getElementById('bp-toast')) {
+      toastEl = document.createElement('div');
+      toastEl.id = 'bp-toast';
+      toastEl.innerHTML =
+        '<button id="bp-toast-close" type="button">✕</button>' +
+        '<div id="bp-toast-title">Baixando…</div>' +
+        '<div id="bp-toast-file"></div>' +
+        '<div id="bp-toast-bar"><div id="bp-toast-fill"></div></div>' +
+        '<div id="bp-toast-footer">' +
+          '<span id="bp-toast-pct">0%</span>' +
+          '<span id="bp-toast-status">Preparando…</span>' +
+        '</div>';
+      document.body.appendChild(toastEl);
+      document.getElementById('bp-toast-close').addEventListener('click', function () {
+        toastEl.classList.remove('show');
+      });
+    } else {
+      toastEl = document.getElementById('bp-toast');
+    }
+    toastFill   = document.getElementById('bp-toast-fill');
+    toastPct    = document.getElementById('bp-toast-pct');
+    toastStatus = document.getElementById('bp-toast-status');
+    toastTitle  = document.getElementById('bp-toast-title');
+    toastFile   = document.getElementById('bp-toast-file');
+
     btnNormal   = document.getElementById('bp-sdl-normal');
     btnSpeed    = document.getElementById('bp-sdl-speed');
     chkRemember = document.getElementById('bp-sdl-chk');
@@ -208,7 +253,6 @@
       btnNormal.style.display = 'none';
       btnSpeed.style.display  = 'none';
       document.querySelector('.sdl-remember').style.display = 'none';
-      btnClose.hidden = true;
       sdlProg.classList.add('show');
       runNormalDownload(activeUrl);
     });
@@ -246,7 +290,7 @@
     document.querySelector('.sdl-remember').style.display = '';
     sdlProg.classList.remove('show');
     sdlFill.style.width = '0%';
-    sdlLabel.textContent = 'Processando...';
+    sdlLabel.textContent = 'Preparando…';
     btnSwitch.classList.remove('show');
     btnClose.hidden = false;
     chkRemember.checked = false;
@@ -270,10 +314,10 @@
       document.querySelector('.sdl-remember').style.display = 'none';
       sdlProg.classList.add('show');
       sdlFill.style.width = '0%';
-      sdlLabel.textContent = 'Processando...';
+      sdlLabel.textContent = 'Preparando…';
       btnSpeed.classList.remove('is-loading');
       btnSwitch.classList.add('show');
-      btnClose.hidden = pref === 'speed';
+      btnClose.hidden = false;
       overlay.classList.add('show');
       document.body.style.overflow = 'hidden';
       if (pref === 'speed') {
@@ -294,6 +338,10 @@
     if (!overlay) return;
     overlay.classList.remove('show');
     document.body.style.overflow = '';
+    // Show toast on desktop if download still running
+    if (downloadInProgress && toastEl && window.innerWidth >= 640) {
+      toastEl.classList.add('show');
+    }
     activeUrl = '';
     activeMeta = null;
   }
@@ -321,8 +369,29 @@
   }
 
   function setProgress(pct, msg) {
-    sdlFill.style.width = Math.round(pct * 100) + '%';
+    var w = Math.round(pct * 100) + '%';
+    sdlFill.style.width = w;
     if (msg) sdlLabel.textContent = msg;
+    // Update toast
+    if (toastFill) toastFill.style.width = w;
+    if (toastPct)  toastPct.textContent  = Math.round(pct * 100) + '%';
+    if (toastStatus && msg) toastStatus.textContent = msg;
+  }
+
+  function showToast(title, filename) {
+    if (!toastEl) return;
+    if (toastTitle) toastTitle.textContent = title || 'Baixando…';
+    if (toastFile)  toastFile.textContent  = filename || '';
+    if (toastFill)  toastFill.style.width  = '0%';
+    if (toastPct)   toastPct.textContent   = '0%';
+    // Remove and re-add to retrigger animation
+    toastEl.classList.remove('show');
+    void toastEl.offsetWidth;
+    toastEl.classList.add('show');
+  }
+
+  function hideToast() {
+    if (toastEl) toastEl.classList.remove('show');
   }
 
   function applySpeed(arrayBuffer) {
@@ -352,9 +421,9 @@
         src.connect(offline.destination);
         src.start(0);
 
-        setProgress(0.35, 'Renderizando...');
+        setProgress(0.35, 'Renderizando…');
         offline.startRendering().then(function (rendered) {
-          setProgress(0.65, 'Preparando versão Speed — renderizando em alta qualidade...');
+          setProgress(0.65, 'Convertendo para MP3…');
 
           loadLame(function (err) {
             if (err) { reject(err); return; }
@@ -389,16 +458,20 @@
 
   function runNormalDownload(url) {
     if (!url) return;
-    setProgress(0.05, 'Baixando arquivo...');
+    downloadInProgress = true;
+    currentMeta = activeMeta;
+    var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Normal';
+    showToast('Baixando faixa', fname);
+    setProgress(0.05, 'Baixando…');
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
     fetch(fetchUrl)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        setProgress(0.8, 'Preparando download...');
+        setProgress(0.8, 'Quase lá…');
         return res.blob();
       })
       .then(function (blob) {
-        setProgress(1, 'Pronto! Iniciando download...');
+        setProgress(1, 'Pronto ✔');
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = normalName(url, activeMeta);
@@ -407,33 +480,40 @@
         setTimeout(function () {
           try { URL.revokeObjectURL(a.href); } catch(e){}
           try { document.body.removeChild(a); } catch(e){}
+          downloadInProgress = false;
+          hideToast();
           closeModal();
         }, 1800);
       })
       .catch(function (err) {
+        downloadInProgress = false;
         sdlFill.style.width = '0%';
-        sdlLabel.textContent = '❌ ' + (err.message || 'Erro no processamento');
+        if (toastFill) toastFill.style.width = '0%';
+        if (toastStatus) toastStatus.textContent = '❌ Erro';
+        sdlLabel.textContent = '❌ ' + (err.message || 'Erro no download');
       });
   }
 
   function runSpeedDownload(url) {
     if (!url) return;
-
+    downloadInProgress = true;
+    var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Speed';
+    showToast('⚡ Processando Speed', fname);
     btnSpeed.classList.add('is-loading');
     sdlProg.classList.add('show');
-    setProgress(0.05, 'Baixando arquivo...');
+    setProgress(0.05, 'Baixando…');
 
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
 
     fetch(fetchUrl)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        setProgress(0.2, 'Processando áudio...');
+        setProgress(0.2, 'Acelerando o áudio…');
         return res.arrayBuffer();
       })
       .then(applySpeed)
       .then(function (blob) {
-        setProgress(1, 'Pronto! Iniciando download...');
+        setProgress(1, 'Pronto ✔');
 
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -445,11 +525,16 @@
         setTimeout(function () {
           try { URL.revokeObjectURL(a.href); } catch(e){}
           try { document.body.removeChild(a); } catch(e){}
+          downloadInProgress = false;
+          hideToast();
           closeModal();
         }, 1800);
       })
       .catch(function (err) {
+        downloadInProgress = false;
         sdlFill.style.width = '0%';
+        if (toastFill) toastFill.style.width = '0%';
+        if (toastStatus) toastStatus.textContent = '❌ Erro';
         sdlLabel.textContent = '❌ ' + (err.message || 'Erro no processamento');
         btnSpeed.classList.remove('is-loading');
       });
