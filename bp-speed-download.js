@@ -117,26 +117,33 @@
       '.sdl-remember input[type=checkbox]:checked::after{content:"";display:block;width:4px;height:8px;border:2px solid #fff;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-1px)}' +
       '.sdl-remember label{font-size:11px;color:rgba(255,255,255,.4);cursor:pointer;user-select:none;flex:1}' +
       '@keyframes bp-shine{0%{background-position:200% center}100%{background-position:-200% center}}' +
-      '@keyframes bp-glow{0%,100%{box-shadow:0 0 6px rgba(164,7,129,.5)}50%{box-shadow:0 0 14px rgba(224,112,200,.8)}}' +
-      '@keyframes bp-toast-in{0%{opacity:0;transform:translateY(16px) scale(.96)}100%{opacity:1;transform:translateY(0) scale(1)}}' +
-      '.sdl-prog{display:none;margin-top:20px}' +
+      '@keyframes bp-glow{0%,100%{box-shadow:0 0 6px rgba(164,7,129,.5)}50%{box-shadow:0 0 16px rgba(224,112,200,.9)}}' +
+      '@keyframes bp-pulse-in{0%{opacity:0;transform:scale(.97)}100%{opacity:1;transform:scale(1)}}' +
+      '.sdl-prog{display:none;margin-top:4px;animation:bp-pulse-in .2s ease both}' +
       '.sdl-prog.show{display:block}' +
-      '.sdl-prog-bar{height:6px;background:rgba(255,255,255,.07);border-radius:999px;overflow:visible;position:relative}' +
-      '.sdl-prog-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#6b0057,#a40781 40%,#e070c8 70%,#f9a8e8);background-size:300% auto;transition:width .45s cubic-bezier(.4,0,.2,1);animation:bp-shine 2s linear infinite;position:relative}' +
-      '.sdl-prog-fill::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:#e070c8;animation:bp-glow 1.4s ease-in-out infinite;transition:opacity .3s}' +
-      '.sdl-prog-label{font-size:11px;color:rgba(255,255,255,.38);margin-top:10px;text-align:center}' +
-      '#bp-toast{position:fixed;bottom:28px;right:24px;width:300px;background:linear-gradient(150deg,#1c0e1a,#120b10);border:1px solid rgba(164,7,129,.4);border-radius:18px;padding:18px 20px 16px;box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 0 1px rgba(164,7,129,.1);z-index:9999998;display:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:bp-toast-in .28s cubic-bezier(.34,1.56,.64,1) both}' +
-      '#bp-toast.show{display:block}' +
-      '#bp-toast-close{position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(255,255,255,.3);font-size:15px;cursor:pointer;padding:2px 5px;line-height:1;transition:color .15s}' +
-      '#bp-toast-close:hover{color:#fff}' +
-      '#bp-toast-title{font-size:13px;font-weight:700;color:#e070c8;margin:0 20px 2px 0;letter-spacing:.1px}' +
-      '#bp-toast-file{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-      '#bp-toast-bar{height:5px;background:rgba(255,255,255,.07);border-radius:999px;overflow:visible;position:relative}' +
+      '.sdl-dl-header{font-size:22px;font-weight:800;color:#fff;margin-bottom:4px;letter-spacing:-.3px;line-height:1.2}' +
+      '.sdl-dl-header.is-speed{color:#e070c8}' +
+      '.sdl-dl-file{font-size:12px;color:rgba(255,255,255,.35);margin-bottom:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '.sdl-prog-bar{height:10px;background:rgba(255,255,255,.08);border-radius:999px;overflow:visible;position:relative}' +
+      '.sdl-prog-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#6b0057,#a40781 40%,#e070c8 70%,#f0a0e0);background-size:300% auto;transition:width .45s cubic-bezier(.4,0,.2,1);animation:bp-shine 2s linear infinite;position:relative}' +
+      '.sdl-prog-fill::after{content:"";position:absolute;right:-2px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;background:#e070c8;box-shadow:0 0 0 3px rgba(224,112,200,.2);animation:bp-glow 1.4s ease-in-out infinite;transition:opacity .3s}' +
+      '.sdl-prog-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px}' +
+      '.sdl-prog-label{font-size:11px;color:rgba(255,255,255,.35)}' +
+      '.sdl-prog-pct{font-size:14px;font-weight:800;color:#e070c8}' +
+      '@keyframes bp-toast-in{0%{opacity:0;transform:translateY(-12px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}' +
+      '#bp-toast{position:fixed;top:18px;right:18px;left:18px;max-width:320px;margin:0 auto;background:linear-gradient(150deg,#1e0f1c 0%,#110a0f 100%);border:1px solid rgba(164,7,129,.45);border-radius:18px;padding:16px 18px 14px;box-shadow:0 12px 40px rgba(0,0,0,.75),0 0 0 1px rgba(164,7,129,.1);z-index:9999999;display:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
+      '#bp-toast.show{display:block;animation:bp-toast-in .26s cubic-bezier(.34,1.56,.64,1) both}' +
+      '@media(min-width:480px){#bp-toast{left:auto;right:20px;max-width:300px;margin:0}}' +
+      '#bp-toast-close{position:absolute;top:11px;right:13px;background:rgba(255,255,255,.07);border:none;border-radius:50%;width:22px;height:22px;color:rgba(255,255,255,.45);font-size:11px;cursor:pointer;padding:0;line-height:22px;text-align:center;transition:background .15s,color .15s}' +
+      '#bp-toast-close:hover{background:rgba(255,255,255,.15);color:#fff}' +
+      '#bp-toast-title{font-size:12px;font-weight:700;color:#e070c8;margin:0 24px 2px 0;letter-spacing:.2px;text-transform:uppercase}' +
+      '#bp-toast-file{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90%}' +
+      '#bp-toast-bar{height:5px;background:rgba(255,255,255,.08);border-radius:999px;overflow:visible;position:relative}' +
       '#bp-toast-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#6b0057,#a40781 40%,#e070c8 70%,#f9a8e8);background-size:300% auto;transition:width .45s cubic-bezier(.4,0,.2,1);animation:bp-shine 2s linear infinite;position:relative}' +
       '#bp-toast-fill::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:#e070c8;animation:bp-glow 1.4s ease-in-out infinite}' +
-      '#bp-toast-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px}' +
-      '#bp-toast-pct{font-size:11px;font-weight:700;color:#a40781}' +
-      '#bp-toast-status{font-size:11px;color:rgba(255,255,255,.3)}' +
+      '#bp-toast-footer{display:flex;justify-content:space-between;align-items:center;margin-top:7px}' +
+      '#bp-toast-pct{font-size:12px;font-weight:800;color:#e070c8}' +
+      '#bp-toast-status{font-size:10px;color:rgba(255,255,255,.35);text-align:right}' +
       '.bp-dl-pref-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:4px;background:rgba(164,7,129,.25);border:1px solid rgba(164,7,129,.4);color:#e070c8;font-weight:700;letter-spacing:.4px;pointer-events:none}' +
       '.sdl-switch{display:none;width:100%;margin-top:14px;padding:11px 16px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);border-radius:14px;color:rgba(255,255,255,.65);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .18s,border-color .18s}' +
       '.sdl-switch:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}' +
@@ -147,7 +154,7 @@
   // =========================
   // Modal
   // =========================
-  var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel, btnSwitch, btnClose;
+  var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel, sdlPct, sdlDlHeader, sdlDlFile, btnSwitch, btnClose;
   var toastEl, toastFill, toastPct, toastStatus, toastTitle, toastFile;
   var downloadInProgress = false;
   var currentMeta = null;
@@ -163,6 +170,9 @@
       sdlProg     = document.getElementById('bp-sdl-prog');
       sdlFill     = document.getElementById('bp-sdl-fill');
       sdlLabel    = document.getElementById('bp-sdl-label');
+      sdlPct      = document.getElementById('bp-sdl-pct');
+      sdlDlHeader = document.getElementById('bp-sdl-dl-header');
+      sdlDlFile   = document.getElementById('bp-sdl-dl-file');
       btnSwitch   = document.getElementById('bp-sdl-switch');
       btnClose    = document.getElementById('bp-sdl-close');
       return;
@@ -199,8 +209,13 @@
         '</div>' +
 
         '<div class="sdl-prog" id="bp-sdl-prog">' +
+          '<div class="sdl-dl-header" id="bp-sdl-dl-header">Baixando…</div>' +
+          '<div class="sdl-dl-file" id="bp-sdl-dl-file"></div>' +
           '<div class="sdl-prog-bar"><div class="sdl-prog-fill" id="bp-sdl-fill"></div></div>' +
-          '<div class="sdl-prog-label" id="bp-sdl-label">Processando...</div>' +
+          '<div class="sdl-prog-footer">' +
+            '<div class="sdl-prog-label" id="bp-sdl-label">Preparando…</div>' +
+            '<div class="sdl-prog-pct" id="bp-sdl-pct">0%</div>' +
+          '</div>' +
         '</div>' +
         '<button type="button" class="sdl-switch" id="bp-sdl-switch">🔄 Trocar preferência</button>' +
       '</div>';
@@ -239,11 +254,14 @@
     sdlProg     = document.getElementById('bp-sdl-prog');
     sdlFill     = document.getElementById('bp-sdl-fill');
     sdlLabel    = document.getElementById('bp-sdl-label');
+    sdlPct      = document.getElementById('bp-sdl-pct');
+    sdlDlHeader = document.getElementById('bp-sdl-dl-header');
+    sdlDlFile   = document.getElementById('bp-sdl-dl-file');
     btnSwitch   = document.getElementById('bp-sdl-switch');
     btnClose    = document.getElementById('bp-sdl-close');
 
     btnClose.addEventListener('click', closeModal);
-    overlay.addEventListener('click', function (e) { if (e.target === overlay && !btnClose.hidden) closeModal(); });
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
 
     btnNormal.addEventListener('click', function (e) {
       e.preventDefault();
@@ -290,7 +308,15 @@
     document.querySelector('.sdl-remember').style.display = '';
     sdlProg.classList.remove('show');
     sdlFill.style.width = '0%';
+    if (sdlPct)  sdlPct.textContent  = '0%';
+    if (sdlDlHeader) { sdlDlHeader.textContent = ''; sdlDlHeader.classList.remove('is-speed'); }
+    if (sdlDlFile)   sdlDlFile.textContent = '';
     sdlLabel.textContent = 'Preparando…';
+    // Restore modal title/sub
+    var h3 = overlay && overlay.querySelector('#bp-sdl-modal h3');
+    var sub = overlay && overlay.querySelector('.sdl-sub');
+    if (h3)  h3.style.display  = '';
+    if (sub) sub.style.display = '';
     btnSwitch.classList.remove('show');
     btnClose.hidden = false;
     chkRemember.checked = false;
@@ -338,8 +364,10 @@
     if (!overlay) return;
     overlay.classList.remove('show');
     document.body.style.overflow = '';
-    // Show toast on desktop if download still running
-    if (downloadInProgress && toastEl && window.innerWidth >= 640) {
+    // Sempre mostra toast se download em andamento (mobile e desktop)
+    if (downloadInProgress && toastEl) {
+      toastEl.classList.remove('show');
+      void toastEl.offsetWidth;
       toastEl.classList.add('show');
     }
     activeUrl = '';
@@ -371,10 +399,11 @@
   function setProgress(pct, msg) {
     var w = Math.round(pct * 100) + '%';
     sdlFill.style.width = w;
+    if (sdlPct)  sdlPct.textContent  = w;
     if (msg) sdlLabel.textContent = msg;
     // Update toast
     if (toastFill) toastFill.style.width = w;
-    if (toastPct)  toastPct.textContent  = Math.round(pct * 100) + '%';
+    if (toastPct)  toastPct.textContent  = w;
     if (toastStatus && msg) toastStatus.textContent = msg;
   }
 
@@ -461,7 +490,20 @@
     downloadInProgress = true;
     currentMeta = activeMeta;
     var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Normal';
-    showToast('Baixando faixa', fname);
+    showToast('⬇️ Baixando faixa', fname);
+    if (sdlDlHeader) sdlDlHeader.textContent = 'Baixando…';
+    if (sdlDlFile)   sdlDlFile.textContent   = fname;
+    // Hide modal title/sub, show clean download card
+    var h3 = overlay.querySelector('#bp-sdl-modal h3');
+    var sub = overlay.querySelector('.sdl-sub');
+    if (h3)  h3.style.display  = 'none';
+    if (sub) sub.style.display = 'none';
+    // Esconde opções, mostra só barra no modal
+    btnNormal.style.display = 'none';
+    btnSpeed.style.display  = 'none';
+    document.querySelector('.sdl-remember').style.display = 'none';
+    btnSwitch.classList.add('show');
+    sdlProg.classList.add('show');
     setProgress(0.05, 'Baixando…');
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
     fetch(fetchUrl)
@@ -499,8 +541,19 @@
     downloadInProgress = true;
     var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Speed';
     showToast('⚡ Processando Speed', fname);
+    if (sdlDlHeader) { sdlDlHeader.textContent = '⚡ Speed'; sdlDlHeader.classList.add('is-speed'); }
+    if (sdlDlFile)   sdlDlFile.textContent = fname;
+    var h3 = overlay.querySelector('#bp-sdl-modal h3');
+    var sub = overlay.querySelector('.sdl-sub');
+    if (h3)  h3.style.display  = 'none';
+    if (sub) sub.style.display = 'none';
     btnSpeed.classList.add('is-loading');
     sdlProg.classList.add('show');
+    // Esconde opções, mostra só barra no modal
+    btnNormal.style.display = 'none';
+    btnSpeed.style.display  = 'none';
+    document.querySelector('.sdl-remember').style.display = 'none';
+    btnSwitch.classList.add('show');
     setProgress(0.05, 'Baixando…');
 
     var fetchUrl = url.indexOf('?') === -1 ? url + '?dl=1' : url + '&dl=1';
