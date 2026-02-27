@@ -144,6 +144,11 @@
       '#bp-toast-footer{display:flex;justify-content:space-between;align-items:center;margin-top:7px}' +
       '#bp-toast-pct{font-size:12px;font-weight:800;color:#e070c8}' +
       '#bp-toast-status{font-size:10px;color:rgba(255,255,255,.35);text-align:right}' +
+      '#bp-toast-queue{display:none;font-size:10px;color:rgba(255,255,255,.35);margin-top:5px}' +
+      '#bp-toast-queue.show{display:block}' +
+      '#bp-toast-switch{display:none;background:none;border:none;padding:0;font-size:10px;color:rgba(164,7,129,.8);cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:2px;margin-top:6px;letter-spacing:.2px}' +
+      '#bp-toast-switch:hover{color:#e070c8}' +
+      '#bp-toast-switch.show{display:inline-block}' +
       '.bp-dl-pref-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:999px;vertical-align:middle;margin-left:4px;background:rgba(164,7,129,.25);border:1px solid rgba(164,7,129,.4);color:#e070c8;font-weight:700;letter-spacing:.4px;pointer-events:none}' +
       '.sdl-switch{display:none;width:100%;margin-top:14px;padding:11px 16px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);border-radius:14px;color:rgba(255,255,255,.65);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .18s,border-color .18s}' +
       '.sdl-switch:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}' +
@@ -156,7 +161,8 @@
   // =========================
   var overlay, btnNormal, btnSpeed, chkRemember, sdlProg, sdlFill, sdlLabel, sdlPct, sdlDlHeader, sdlDlFile, btnSwitch, btnClose;
   var toastEl, toastFill, toastPct, toastStatus, toastTitle, toastFile;
-  var downloadInProgress = false;
+  var dlQueue   = [];   // { url, meta, type:'normal'|'speed' }
+  var dlRunning = false;
   var currentMeta = null;
   var activeUrl = '';
   var activeMeta = null;
@@ -234,10 +240,17 @@
         '<div id="bp-toast-footer">' +
           '<span id="bp-toast-pct">0%</span>' +
           '<span id="bp-toast-status">Preparando…</span>' +
-        '</div>';
+        '</div>' +
+        '<div id="bp-toast-queue"></div>' +
+        '<button type="button" id="bp-toast-switch">🔄 Trocar preferência de download</button>';
       document.body.appendChild(toastEl);
       document.getElementById('bp-toast-close').addEventListener('click', function () {
         toastEl.classList.remove('show');
+      });
+      document.getElementById('bp-toast-switch').addEventListener('click', function () {
+        clearRememberAndPref();
+        updatePrefBadges();
+        document.getElementById('bp-toast-switch').classList.remove('show');
       });
     } else {
       toastEl = document.getElementById('bp-toast');
@@ -267,18 +280,17 @@
       e.preventDefault();
       if (!chkRemember.checked && Date.now() - modalOpenTime < 1000) return;
       if (chkRemember.checked) { setRemember(true); setPref('normal'); updatePrefBadges(); }
-      // Esconde opções, mostra progresso
-      btnNormal.style.display = 'none';
-      btnSpeed.style.display  = 'none';
-      document.querySelector('.sdl-remember').style.display = 'none';
-      sdlProg.classList.add('show');
-      runNormalDownload(activeUrl);
+      var u = activeUrl, m = activeMeta;
+      closeModal();
+      enqueue(u, m, 'normal');
     });
 
     btnSpeed.addEventListener('click', function () {
       if (!chkRemember.checked && Date.now() - modalOpenTime < 1000) return;
       if (chkRemember.checked) { setRemember(true); setPref('speed'); updatePrefBadges(); }
-      runSpeedDownload(activeUrl);
+      var u = activeUrl, m = activeMeta;
+      closeModal();
+      enqueue(u, m, 'speed');
     });
 
     // ✅ Só desmarcar = esquecer tudo
@@ -299,6 +311,45 @@
   }
 
   var modalOpenTime = 0;
+
+  // =========================
+  // Fila de downloads
+  // =========================
+  function enqueue(url, meta, type) {
+    dlQueue.push({ url: url, meta: meta, type: type });
+    updateQueueBadge();
+    if (!dlRunning) processNext();
+  }
+
+  function processNext() {
+    if (dlQueue.length === 0) {
+      dlRunning = false;
+      return;
+    }
+    dlRunning = true;
+    var item = dlQueue.shift();
+    activeUrl  = item.url;
+    activeMeta = item.meta;
+    updateQueueBadge();
+    if (item.type === 'speed') {
+      runSpeedDownload(item.url);
+    } else {
+      runNormalDownload(item.url);
+    }
+  }
+
+  function updateQueueBadge() {
+    var el = document.getElementById('bp-toast-queue');
+    if (!el) return;
+    var n = dlQueue.length;
+    if (n > 0) {
+      el.textContent = '🎵 +' + n + ' na fila';
+      el.classList.add('show');
+    } else {
+      el.textContent = '';
+      el.classList.remove('show');
+    }
+  }
 
   function resetModalToChoice() {
     // Mostra botões + checkbox, esconde progresso + switch, mostra ✕
@@ -334,23 +385,10 @@
     var pref = getPref();
 
     if (getRemember() && pref) {
-      // Auto-download mode: esconde opções, mostra progresso + switch, esconde ✕
-      btnNormal.style.display = 'none';
-      btnSpeed.style.display  = 'none';
-      document.querySelector('.sdl-remember').style.display = 'none';
-      sdlProg.classList.add('show');
-      sdlFill.style.width = '0%';
-      sdlLabel.textContent = 'Preparando…';
-      btnSpeed.classList.remove('is-loading');
-      btnSwitch.classList.add('show');
-      btnClose.hidden = false;
-      overlay.classList.add('show');
-      document.body.style.overflow = 'hidden';
-      if (pref === 'speed') {
-        runSpeedDownload(url);
-      } else {
-        runNormalDownload(url);
-      }
+      // Pref salva: enfileira, sem abrir modal
+      var toastSwitch = document.getElementById('bp-toast-switch');
+      if (toastSwitch) toastSwitch.classList.add('show');
+      enqueue(url, meta, pref);
     } else {
       // Choice mode normal
       resetModalToChoice();
@@ -365,7 +403,7 @@
     overlay.classList.remove('show');
     document.body.style.overflow = '';
     // Sempre mostra toast se download em andamento (mobile e desktop)
-    if (downloadInProgress && toastEl) {
+    if (dlRunning && toastEl) {
       toastEl.classList.remove('show');
       void toastEl.offsetWidth;
       toastEl.classList.add('show');
@@ -421,6 +459,8 @@
 
   function hideToast() {
     if (toastEl) toastEl.classList.remove('show');
+    var ts = document.getElementById('bp-toast-switch');
+    if (ts) ts.classList.remove('show');
   }
 
   function applySpeed(arrayBuffer) {
@@ -487,7 +527,7 @@
 
   function runNormalDownload(url) {
     if (!url) return;
-    downloadInProgress = true;
+    dlRunning = true;
     currentMeta = activeMeta;
     var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Normal';
     showToast('⬇️ Baixando faixa', fname);
@@ -522,23 +562,26 @@
         setTimeout(function () {
           try { URL.revokeObjectURL(a.href); } catch(e){}
           try { document.body.removeChild(a); } catch(e){}
-          downloadInProgress = false;
+        }, 400);
+        setTimeout(function () {
           hideToast();
           closeModal();
-        }, 1800);
+          processNext();
+        }, 2800);
       })
       .catch(function (err) {
-        downloadInProgress = false;
+        dlRunning = false;
         sdlFill.style.width = '0%';
         if (toastFill) toastFill.style.width = '0%';
         if (toastStatus) toastStatus.textContent = '❌ Erro';
         sdlLabel.textContent = '❌ ' + (err.message || 'Erro no download');
+        setTimeout(processNext, 2000);
       });
   }
 
   function runSpeedDownload(url) {
     if (!url) return;
-    downloadInProgress = true;
+    dlRunning = true;
     var fname = activeMeta && activeMeta.title ? (activeMeta.artist ? activeMeta.artist + ' — ' + activeMeta.title : activeMeta.title) : 'Versão Speed';
     showToast('⚡ Processando Speed', fname);
     if (sdlDlHeader) { sdlDlHeader.textContent = '⚡ Speed'; sdlDlHeader.classList.add('is-speed'); }
@@ -578,18 +621,19 @@
         setTimeout(function () {
           try { URL.revokeObjectURL(a.href); } catch(e){}
           try { document.body.removeChild(a); } catch(e){}
-          downloadInProgress = false;
           hideToast();
           closeModal();
+          processNext();
         }, 1800);
       })
       .catch(function (err) {
-        downloadInProgress = false;
+        dlRunning = false;
         sdlFill.style.width = '0%';
         if (toastFill) toastFill.style.width = '0%';
         if (toastStatus) toastStatus.textContent = '❌ Erro';
         sdlLabel.textContent = '❌ ' + (err.message || 'Erro no processamento');
         btnSpeed.classList.remove('is-loading');
+        setTimeout(processNext, 2000);
       });
   }
 
